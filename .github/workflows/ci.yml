@@ -18,6 +18,6 @@ jobs:
         with:
           node-version: 22
           cache: npm
+      - run: mkdir -p .sites-runtime/npm-cache
       - run: npm ci
-      - run: npm run lint
       - run: npm run build:vercel
