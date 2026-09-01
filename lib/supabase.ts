@@ -1,69 +1,22 @@
 import { createClient } from "@supabase/supabase-js";
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "https://idzahhvslobjywqyklml.supabase.co";
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? "sb_publishable_b5Sy7_MiCapOrVFS5JysAw_PNiISL6L";
+const supabaseUrl=process.env.NEXT_PUBLIC_SUPABASE_URL??"https://idzahhvslobjywqyklml.supabase.co";
+const supabaseKey=process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY??"sb_publishable_b5Sy7_MiCapOrVFS5JysAw_PNiISL6L";
+export type Language="en"|"de"|"ar"; export type CandidateStatus="draft"|"submitted"|"under_review"|"verified"|"rejected";
+export type CandidateDocument={id:string;document_type:string;file_name:string;storage_path:string;verification_status:"pending"|"verified"|"rejected";created_at:string};
+export type JobPreferences={desired_role:string;preferred_region:string;possible_start:string;workplace:string};
+export type CandidateWorkspace={candidate:null|{id:string;full_name:string|null;email:string|null;phone:string|null;nationality:string|null;residence:string|null;preferred_language:Language;status:CandidateStatus;reference_number:string|null;submitted_at:string|null};answers:Record<string,string>;documents:CandidateDocument[];preferences:JobPreferences};
+export const supabase=createClient(supabaseUrl,supabaseKey,{auth:{persistSession:true,autoRefreshToken:true}});
 
-export const supabase = createClient(supabaseUrl, supabaseKey, {
-  auth: { persistSession: true, autoRefreshToken: true },
-});
+async function ensureCandidateSession(){const {data}=await supabase.auth.getSession();if(data.session?.user)return data.session.user;const result=await supabase.auth.signInAnonymously();if(result.error||!result.data.user)throw result.error??new Error("Candidate session could not be created.");return result.data.user}
+const emptyPreferences:JobPreferences={desired_role:"",preferred_region:"",possible_start:"",workplace:""};
 
-async function ensureCandidateSession() {
-  const { data: sessionData } = await supabase.auth.getSession();
-  if (sessionData.session?.user) return sessionData.session.user;
+export async function getCandidateWorkspace():Promise<CandidateWorkspace>{const user=await ensureCandidateSession();const [candidate,intake,documents,preferences]=await Promise.all([supabase.from("candidates").select("id,full_name,email,phone,nationality,residence,preferred_language,status,reference_number,submitted_at").eq("id",user.id).maybeSingle(),supabase.from("candidate_intakes").select("answers").eq("candidate_id",user.id).maybeSingle(),supabase.from("candidate_documents").select("id,document_type,file_name,storage_path,verification_status,created_at").eq("candidate_id",user.id).order("created_at",{ascending:false}),supabase.from("candidate_job_preferences").select("desired_role,preferred_region,possible_start,workplace").eq("candidate_id",user.id).maybeSingle()]);for(const result of [candidate,intake,documents,preferences])if(result.error)throw result.error;return{candidate:candidate.data as CandidateWorkspace["candidate"],answers:(intake.data?.answers??{}) as Record<string,string>,documents:(documents.data??[]) as CandidateDocument[],preferences:{...emptyPreferences,...preferences.data}}}
 
-  const { data, error } = await supabase.auth.signInAnonymously();
-  if (error || !data.user) throw error ?? new Error("Candidate session could not be created.");
-  return data.user;
-}
+export async function saveCandidateDraft(answers:Record<string,string>,language:Language){const user=await ensureCandidateSession();const now=new Date().toISOString();const {data:current}=await supabase.from("candidates").select("status").eq("id",user.id).maybeSingle();const status:CandidateStatus=current?.status&&current.status!=="draft"?current.status:"draft";const candidate=await supabase.from("candidates").upsert({id:user.id,full_name:answers.fullName||null,email:answers.email||null,phone:answers.phone||null,nationality:answers.nationality||null,residence:answers.residence||null,preferred_language:language,status,last_draft_saved_at:now,updated_at:now});if(candidate.error)throw candidate.error;const intake=await supabase.from("candidate_intakes").upsert({candidate_id:user.id,answers,updated_at:now},{onConflict:"candidate_id"});if(intake.error)throw intake.error}
+export async function saveCandidateLanguage(language:Language){const workspace=await getCandidateWorkspace();await saveCandidateDraft(workspace.answers,language)}
 
-type IntakeSubmission = {
-  answers: Record<string, string>;
-  documentFiles: Record<string, File>;
-  language: "en" | "de" | "ar";
-};
-
-export async function submitCandidateIntake({ answers, documentFiles, language }: IntakeSubmission) {
-  const user = await ensureCandidateSession();
-  const candidate = {
-    id: user.id,
-    full_name: answers.fullName,
-    email: answers.email,
-    phone: answers.phone,
-    nationality: answers.nationality,
-    residence: answers.residence,
-    preferred_language: language,
-    status: "submitted",
-    submitted_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  };
-
-  const { error: candidateError } = await supabase.from("candidates").upsert(candidate);
-  if (candidateError) throw candidateError;
-
-  const { error: intakeError } = await supabase.from("candidate_intakes").upsert({
-    candidate_id: user.id,
-    answers,
-    consent_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  }, { onConflict: "candidate_id" });
-  if (intakeError) throw intakeError;
-
-  for (const [documentType, file] of Object.entries(documentFiles)) {
-    const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "-");
-    const storagePath = `${user.id}/${documentType}/${crypto.randomUUID()}-${safeName}`;
-    const { error: uploadError } = await supabase.storage.from("candidate-documents").upload(storagePath, file, { upsert: false });
-    if (uploadError) throw uploadError;
-    const { error: metadataError } = await supabase.from("candidate_documents").insert({
-      candidate_id: user.id,
-      document_type: documentType,
-      file_name: file.name,
-      storage_path: storagePath,
-      mime_type: file.type || null,
-      file_size: file.size,
-      verification_status: "pending",
-    });
-    if (metadataError) throw metadataError;
-  }
-
-  return user.id;
-}
+export async function uploadCandidateDocument(documentType:string,file:File):Promise<CandidateDocument>{const user=await ensureCandidateSession();const safeName=file.name.replace(/[^a-zA-Z0-9._-]/g,"-");const storagePath=`${user.id}/${documentType}/${crypto.randomUUID()}-${safeName}`;const uploaded=await supabase.storage.from("candidate-documents").upload(storagePath,file,{upsert:false});if(uploaded.error)throw uploaded.error;const inserted=await supabase.from("candidate_documents").insert({candidate_id:user.id,document_type:documentType,file_name:file.name,storage_path:storagePath,mime_type:file.type||null,file_size:file.size,verification_status:"pending"}).select("id,document_type,file_name,storage_path,verification_status,created_at").single();if(inserted.error){await supabase.storage.from("candidate-documents").remove([storagePath]);throw inserted.error}return inserted.data as CandidateDocument}
+export async function deleteCandidateDocument(document:CandidateDocument){const removed=await supabase.storage.from("candidate-documents").remove([document.storage_path]);if(removed.error)throw removed.error;const deleted=await supabase.from("candidate_documents").delete().eq("id",document.id);if(deleted.error)throw deleted.error}
+export async function saveJobPreferences(preferences:JobPreferences){const user=await ensureCandidateSession();const result=await supabase.from("candidate_job_preferences").upsert({candidate_id:user.id,...preferences,updated_at:new Date().toISOString()},{onConflict:"candidate_id"});if(result.error)throw result.error}
+export async function submitCandidateIntake({answers,documentFiles,language}:{answers:Record<string,string>;documentFiles:Record<string,File>;language:Language}){await saveCandidateDraft(answers,language);const user=await ensureCandidateSession();for(const [type,file] of Object.entries(documentFiles))await uploadCandidateDocument(type,file);const reference=`MB-${new Date().getFullYear()}-${user.id.slice(0,8).toUpperCase()}`;const now=new Date().toISOString();const candidate=await supabase.from("candidates").update({status:"submitted",reference_number:reference,submitted_at:now,updated_at:now}).eq("id",user.id);if(candidate.error)throw candidate.error;const intake=await supabase.from("candidate_intakes").update({consent_at:now,updated_at:now}).eq("candidate_id",user.id);if(intake.error)throw intake.error;return reference}
