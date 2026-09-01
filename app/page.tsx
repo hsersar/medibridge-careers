@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import type { FormEvent } from "react";
 import { ArrowLeft, ArrowRight, BadgeCheck, Bell, BriefcaseBusiness, Camera, Check, ChevronRight, Clock3, Download, Eye, FileCheck2, FileText, Heart, Home, Languages, MapPin, RefreshCw, ShieldCheck, Sparkles, UploadCloud, UserRound, ClipboardList, GraduationCap, Stethoscope, Globe2, PlaneTakeoff, SlidersHorizontal, HelpCircle, Settings, MessageCircleQuestion, CalendarDays, LogOut, Share2 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { Sheet, SheetClose, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import { deleteCandidateAvatar, deleteCandidateDocument, getCandidateAvatarUrl, getCandidateDocumentUrl, getCandidateWorkspace, replaceCandidateDocument, saveCandidateDraft, saveCandidateLanguage, saveJobPreferences, submitCandidateIntake, uploadCandidateAvatar, uploadCandidateDocument, type CandidateDocument, type CandidateStatus, type JobPreferences } from "@/lib/supabase";
+import { deleteCandidateAvatar, deleteCandidateDocument, getAuthenticatedCandidate, getCandidateAvatarUrl, getCandidateDocumentUrl, getCandidateWorkspace, registerCandidate, replaceCandidateDocument, saveCandidateDraft, saveCandidateLanguage, saveJobPreferences, signInCandidate, signOutCandidate, submitCandidateIntake, uploadCandidateAvatar, uploadCandidateDocument, type CandidateDocument, type CandidateStatus, type JobPreferences } from "@/lib/supabase";
 import {expressJobInterest,listMyInterests,listPublishedJobs,type Job,type JobInterest} from "@/lib/jobs";
 
 type Language = "en" | "de" | "ar";
@@ -77,7 +78,67 @@ const persistenceCopy = {
   ar:{saving:"جارٍ الإرسال بأمان…",error:"تعذر إرسال بياناتك. يرجى المحاولة مرة أخرى."}
 } as const;
 
-export default function HomePage() {
+export default function HomePage(){
+  const [checking,setChecking]=useState(true);
+  const [authenticatedEmail,setAuthenticatedEmail]=useState<string|null>(null);
+
+  useEffect(()=>{
+    let active=true;
+    getAuthenticatedCandidate()
+      .then(user=>{if(active)setAuthenticatedEmail(user?.email??null)})
+      .catch(()=>{if(active)setAuthenticatedEmail(null)})
+      .finally(()=>{if(active)setChecking(false)});
+    return()=>{active=false};
+  },[]);
+
+  const authenticated=(email:string)=>{setAuthenticatedEmail(email);setChecking(false)};
+  const signOut=async()=>{
+    await signOutCandidate();
+    setAuthenticatedEmail(null);
+  };
+
+  if(checking)return <main className="welcome-shell"><section className="welcome-card loading-card"><Brand/><div className="loading-mark"><ShieldCheck/></div><p className="lead">MediBridge Careers</p></section></main>;
+  if(!authenticatedEmail)return <CandidateAuth onAuthenticated={authenticated}/>;
+  return <AuthenticatedApp authenticatedEmail={authenticatedEmail} onSignOut={signOut}/>;
+}
+
+function CandidateAuth({onAuthenticated}:{onAuthenticated:(email:string)=>void}){
+  const [mode,setMode]=useState<"welcome"|"login"|"signup">("welcome");
+  const [email,setEmail]=useState("");
+  const [password,setPassword]=useState("");
+  const [busy,setBusy]=useState(false);
+  const [error,setError]=useState("");
+  const [notice,setNotice]=useState("");
+
+  const submit=async(event:FormEvent<HTMLFormElement>)=>{
+    event.preventDefault();
+    setBusy(true);setError("");setNotice("");
+    try{
+      if(mode==="login"){
+        const user=await signInCandidate(email,password);
+        onAuthenticated(user.email??email.trim().toLowerCase());
+      }else{
+        const result=await registerCandidate(email,password);
+        if(result.session&&result.user&&!result.user.is_anonymous){
+          onAuthenticated(result.user.email??email.trim().toLowerCase());
+        }else{
+          setNotice("Please confirm the link in your email. You can sign in after your email address has been verified.");
+          setMode("login");
+          setPassword("");
+        }
+      }
+    }catch{
+      setError(mode==="login"?"Email or password is incorrect.":"Registration could not be completed. The email may already be registered.");
+    }finally{setBusy(false)}
+  };
+
+  if(mode==="welcome")return <main className="welcome-shell"><section className="welcome-card"><Brand/><div className="welcome-visual" aria-hidden="true"><div className="passport-card"><span>MB</span><BadgeCheck/></div><div className="journey-line"><span>✦</span></div><div className="germany-card"><span>DE</span><Check/></div></div><div><p className="eyebrow">MEDIBRIDGE CAREERS</p><h1>Find your career in Germany</h1><p className="lead">Create your candidate profile and let MediBridge connect you with verified healthcare employers.</p></div><div className="welcome-actions"><button className="primary-button" onClick={()=>setMode("signup")}>Create my profile<ArrowRight size={18}/></button><button className="text-button" onClick={()=>setMode("login")}>I already have an account</button></div><p className="privacy-line"><ShieldCheck size={16}/>Your data stays private</p></section></main>;
+
+  const login=mode==="login";
+  return <main className="welcome-shell"><section className="welcome-card auth-card"><Brand/><button className="auth-back" type="button" onClick={()=>{setMode("welcome");setError("");setNotice("")}}><ArrowLeft size={18}/>Back</button><div className="auth-heading"><p className="eyebrow">MEDIBRIDGE CAREERS</p><h1>{login?"Sign in":"Create your account"}</h1><p className="lead">{login?"Use your registered email address and password.":"Register securely before creating your candidate profile."}</p></div><form className="auth-form" onSubmit={submit}><label><span>Email address</span><input type="email" autoComplete="email" required value={email} onChange={event=>setEmail(event.target.value)} placeholder="name@example.com"/></label><label><span>Password</span><input type="password" autoComplete={login?"current-password":"new-password"} minLength={8} required value={password} onChange={event=>setPassword(event.target.value)} placeholder="At least 8 characters"/></label>{error&&<p className="auth-message error" role="alert">{error}</p>}{notice&&<p className="auth-message success" role="status">{notice}</p>}<button className="primary-button" disabled={busy} type="submit">{busy?"Please wait…":login?"Sign in":"Create account"}{!busy&&<ArrowRight size={18}/>}</button></form><button className="text-button" type="button" onClick={()=>{setMode(login?"signup":"login");setError("");setNotice("");setPassword("")}}>{login?"New to MediBridge? Create an account":"Already registered? Sign in"}</button><p className="privacy-line"><ShieldCheck size={16}/>Access is only granted after a successful Supabase login.</p></section></main>;
+}
+
+function AuthenticatedApp({authenticatedEmail,onSignOut}:{authenticatedEmail:string;onSignOut:()=>Promise<void>}) {
 /* Legacy Sites account flow retained in history during the Supabase migration.
   const [lang,setLang]=useState<Language>("en"); const [view,setView]=useState<View>("home"); const [onboarded,setOnboarded]=useState(false); const [editing,setEditing]=useState(false); const [savedJobs,setSavedJobs]=useState<number[]>([]); const [selectedJob,setSelectedJob]=useState(0); const [interested,setInterested]=useState(false); const [files,setFiles]=useState<string[]>([]); const [intakeStep,setIntakeStep]=useState(0); const [intakeAnswers,setIntakeAnswers]=useState<Record<string,string>>({}); const [intakeDocuments,setIntakeDocuments]=useState<Record<string,string>>({}); const [intakeDocumentFiles,setIntakeDocumentFiles]=useState<Record<string,File>>({}); const [intakeConsent,setIntakeConsent]=useState(false); const [intakeSubmitted,setIntakeSubmitted]=useState(false); const [intakeSaving,setIntakeSaving]=useState(false); const [intakeError,setIntakeError]=useState(""); const [account,setAccount]=useState<Account>(emptyAccount); const [accountLoading,setAccountLoading]=useState(true); const [accountError,setAccountError]=useState(""); const [profileSaving,setProfileSaving]=useState(false); const fileRef=useRef<HTMLInputElement>(null); const t=copy[lang]; const rtl=lang==="ar";
   useEffect(()=>{fetch("/api/me").then(async response=>{if(!response.ok)throw new Error(response.status===401?"signin":"load");return response.json()}).then(data=>{const next={...emptyAccount,...data,preferredLanguage:data.preferredLanguage??"en",onboardingCompleted:!!data.onboardingCompleted};setAccount(next);setLang(next.preferredLanguage);setOnboarded(!!next.onboardingCompleted||!!next.fullName)}).catch(error=>setAccountError(error.message)).finally(()=>setAccountLoading(false))},[]);
@@ -91,11 +152,12 @@ export default function HomePage() {
   const focused=view==="job"||view==="intake"||view==="jobPreferences"||view==="settings"||view==="help";
   return <main className="app-shell" dir={rtl?"rtl":"ltr"}><div className="app-frame"><header className={`topbar ${focused?"focused":"main-header"}`}>{focused?<><button className="icon-button header-back" onClick={()=>view==="job"?setView("jobs"):setView("profile")} aria-label="Back"><ArrowLeft size={21}/></button><div className="header-brand"><Brand compact/></div><span className="header-spacer"/></>:<><div className="header-profile"><ProfileMenu lang={lang} setView={setView} account={account} compact/></div><div className="header-brand"><Brand compact/></div><button className="icon-button header-bell" aria-label="Notifications"><Bell size={20}/></button></>}</header><div className="page-content">{accountError&&<div className="app-error">{lang==="de"?"Änderungen konnten nicht gespeichert werden.":lang==="ar"?"تعذر حفظ التغييرات.":"Changes could not be saved."}</div>}{view==="home"&&<Dashboard t={t} lang={lang} account={account} submitted={intakeSubmitted} openJob={openJob} setView={setView}/>} {view==="jobs"&&<JobsList t={t} savedJobs={savedJobs} setSavedJobs={setSavedJobs} openJob={openJob}/>} {view==="documents"&&<Documents t={t} files={files} fileRef={fileRef} onFiles={(names:string[])=>setFiles(c=>[...c,...names])}/>} {view==="profile"&&<Profile t={t} editing={editing} setEditing={setEditing} setView={setView} lang={lang} submitted={intakeSubmitted} account={account} saving={profileSaving} onSave={saveProfile}/>} {view==="job"&&<JobDetail t={t} job={jobs[selectedJob]} interested={interested} setInterested={setInterested} saved={savedJobs.includes(selectedJob)} toggleSaved={()=>setSavedJobs(s=>s.includes(selectedJob)?s.filter(x=>x!==selectedJob):[...s,selectedJob])}/>} {view==="intake"&&<Intake lang={lang} step={intakeStep} setStep={setIntakeStep} answers={intakeAnswers} setAnswers={setIntakeAnswers} documents={intakeDocuments} setDocuments={setIntakeDocuments} setDocumentFiles={setIntakeDocumentFiles} consent={intakeConsent} setConsent={setIntakeConsent} submitted={intakeSubmitted} saving={intakeSaving} error={intakeError} onSubmit={submitIntake} onDone={()=>setView("home")}/>} {view==="jobPreferences"&&<JobPreferences lang={lang}/>} {view==="settings"&&<SettingsPage lang={lang} setLang={changeLanguage}/>} {view==="help"&&<HelpPage lang={lang}/>}</div>{!focused&&<BottomNav t={t} view={view} setView={setView}/>}</div></main>;
 */
-  const [lang,setLang]=useState<Language>("en"); const [view,setView]=useState<View>("home"); const [onboarded,setOnboarded]=useState(false); const [loading,setLoading]=useState(true); const [savedJobs,setSavedJobs]=useState<number[]>([]); const [selectedJob,setSelectedJob]=useState(0); const [interested,setInterested]=useState(false); const [intakeStep,setIntakeStep]=useState(0); const [intakeAnswers,setIntakeAnswers]=useState<Record<string,string>>({}); const [intakeDocuments,setIntakeDocuments]=useState<Record<string,string>>({}); const [intakeDocumentFiles,setIntakeDocumentFiles]=useState<Record<string,File>>({}); const [intakeConsent,setIntakeConsent]=useState(false); const [intakeSubmitted,setIntakeSubmitted]=useState(false); const [intakeSaving,setIntakeSaving]=useState(false); const [intakeError,setIntakeError]=useState(""); const [status,setStatus]=useState<CandidateStatus>("draft"); const [reference,setReference]=useState(""); const [documents,setDocuments]=useState<CandidateDocument[]>([]); const [preferences,setPreferences]=useState<JobPreferences>({desired_role:"",preferred_region:"",possible_start:"",workplace:""}); const [draftState,setDraftState]=useState<"idle"|"saving"|"saved"|"error">("idle"); const loaded=useRef(false); const t=copy[lang]; const rtl=lang==="ar";
+  const [lang,setLang]=useState<Language>("en"); const [view,setView]=useState<View>("home"); const [onboarded,setOnboarded]=useState(true); const [loading,setLoading]=useState(true); const [savedJobs,setSavedJobs]=useState<number[]>([]); const [selectedJob,setSelectedJob]=useState(0); const [interested,setInterested]=useState(false); const [intakeStep,setIntakeStep]=useState(0); const [intakeAnswers,setIntakeAnswers]=useState<Record<string,string>>({email:authenticatedEmail}); const [intakeDocuments,setIntakeDocuments]=useState<Record<string,string>>({}); const [intakeDocumentFiles,setIntakeDocumentFiles]=useState<Record<string,File>>({}); const [intakeConsent,setIntakeConsent]=useState(false); const [intakeSubmitted,setIntakeSubmitted]=useState(false); const [intakeSaving,setIntakeSaving]=useState(false); const [intakeError,setIntakeError]=useState(""); const [status,setStatus]=useState<CandidateStatus>("draft"); const [reference,setReference]=useState(""); const [documents,setDocuments]=useState<CandidateDocument[]>([]); const [preferences,setPreferences]=useState<JobPreferences>({desired_role:"",preferred_region:"",possible_start:"",workplace:""}); const [draftState,setDraftState]=useState<"idle"|"saving"|"saved"|"error">("idle"); const loaded=useRef(false); const t=copy[lang]; const rtl=lang==="ar";
   const [liveJobs,setLiveJobs]=useState<Job[]>([]);const [interests,setInterests]=useState<JobInterest[]>([]);const [avatarUrl,setAvatarUrl]=useState("");const [avatarPath,setAvatarPath]=useState("");
-  const account:Account={...emptyAccount,fullName:intakeAnswers.fullName||"",email:intakeAnswers.email||"",country:intakeAnswers.residence||"",profession:intakeAnswers.targetRole||"",experience:intakeAnswers.years||"",germanLevel:intakeAnswers.german||"",preferredLanguage:lang,onboardingCompleted:!!intakeAnswers.fullName,avatarUrl,avatarPath};
-  useEffect(()=>{getCandidateWorkspace().then(async workspace=>{setIntakeAnswers(workspace.answers);setDocuments(workspace.documents);setPreferences(workspace.preferences);if(workspace.candidate){setLang(workspace.candidate.preferred_language);setAvatarPath(workspace.candidate.avatar_path||"");if(workspace.candidate.avatar_path)setAvatarUrl(await getCandidateAvatarUrl(workspace.candidate.avatar_path));setStatus(workspace.candidate.status);setReference(workspace.candidate.reference_number||"");setIntakeSubmitted(workspace.candidate.status!=="draft");setOnboarded(true)}}).catch(error=>{console.error(error);setIntakeError(persistenceCopy.en.error)}).finally(()=>{loaded.current=true;setLoading(false)})},[]);
+  const account:Account={...emptyAccount,fullName:intakeAnswers.fullName||"",email:intakeAnswers.email||authenticatedEmail,country:intakeAnswers.residence||"",profession:intakeAnswers.targetRole||"",experience:intakeAnswers.years||"",germanLevel:intakeAnswers.german||"",preferredLanguage:lang,onboardingCompleted:!!intakeAnswers.fullName,avatarUrl,avatarPath};
+  useEffect(()=>{getCandidateWorkspace().then(async workspace=>{setIntakeAnswers({email:authenticatedEmail,...workspace.answers});setDocuments(workspace.documents);setPreferences(workspace.preferences);if(workspace.candidate){setLang(workspace.candidate.preferred_language);setAvatarPath(workspace.candidate.avatar_path||"");if(workspace.candidate.avatar_path)setAvatarUrl(await getCandidateAvatarUrl(workspace.candidate.avatar_path));setStatus(workspace.candidate.status);setReference(workspace.candidate.reference_number||"");setIntakeSubmitted(workspace.candidate.status!=="draft")}else{setView("intake")}}).catch(error=>{console.error(error);setIntakeError(persistenceCopy.en.error)}).finally(()=>{loaded.current=true;setLoading(false)})},[authenticatedEmail]);
   useEffect(()=>{const handler=(event:Event)=>{const detail=(event as CustomEvent<{url:string;path:string}>).detail;setAvatarUrl(detail.url);setAvatarPath(detail.path)};window.addEventListener("medibridge-avatar",handler);return()=>window.removeEventListener("medibridge-avatar",handler)},[]);
+  useEffect(()=>{const handler=(event:MouseEvent)=>{const target=event.target as Element|null;if(!target?.closest(".menu-signout"))return;event.preventDefault();void onSignOut()};document.addEventListener("click",handler);return()=>document.removeEventListener("click",handler)},[onSignOut]);
   useEffect(()=>{Promise.all([listPublishedJobs(),listMyInterests()]).then(([available,current])=>{setLiveJobs(available);setInterests(current)}).catch(console.error)},[]);
   useEffect(()=>{if(!loaded.current||Object.keys(intakeAnswers).length===0)return;setDraftState("saving");const timer=setTimeout(()=>saveCandidateDraft(intakeAnswers,lang).then(()=>setDraftState("saved")).catch(()=>setDraftState("error")),700);return()=>clearTimeout(timer)},[intakeAnswers,lang]);
   const openJob=(i:number)=>{setSelectedJob(i);setInterested(false);setView("job")};
