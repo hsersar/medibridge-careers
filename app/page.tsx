@@ -5,7 +5,7 @@ import type { FormEvent } from "react";
 import { ArrowLeft, ArrowRight, BadgeCheck, Bell, BriefcaseBusiness, Camera, Check, ChevronRight, Clock3, Download, Eye, FileCheck2, FileText, Heart, Home, Languages, MapPin, RefreshCw, ShieldCheck, Sparkles, UploadCloud, UserRound, ClipboardList, GraduationCap, Stethoscope, Globe2, PlaneTakeoff, SlidersHorizontal, HelpCircle, Settings, MessageCircleQuestion, CalendarDays, LogOut, Share2 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { Sheet, SheetClose, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import { deleteCandidateAvatar, deleteCandidateDocument, getAuthenticatedCandidate, getCandidateAvatarUrl, getCandidateDocumentUrl, getCandidateWorkspace, registerCandidate, replaceCandidateDocument, saveCandidateDraft, saveCandidateLanguage, saveJobPreferences, signInCandidate, signOutCandidate, submitCandidateIntake, uploadCandidateAvatar, uploadCandidateDocument, type CandidateDocument, type CandidateStatus, type JobPreferences } from "@/lib/supabase";
+import { deleteCandidateAvatar, deleteCandidateDocument, getAuthenticatedCandidate, getCandidateAvatarUrl, getCandidateDocumentUrl, getCandidateWorkspace, registerCandidate, replaceCandidateDocument, requestCandidatePasswordReset, resendCandidateConfirmation, saveCandidateDraft, saveCandidateLanguage, saveJobPreferences, signInCandidate, signOutCandidate, submitCandidateIntake, uploadCandidateAvatar, uploadCandidateDocument, type CandidateDocument, type CandidateStatus, type JobPreferences } from "@/lib/supabase";
 import {expressJobInterest,listMyInterests,listPublishedJobs,type Job,type JobInterest} from "@/lib/jobs";
 
 type Language = "en" | "de" | "ar";
@@ -103,7 +103,7 @@ export default function HomePage(){
 }
 
 function CandidateAuth({onAuthenticated}:{onAuthenticated:(email:string)=>void}){
-  const [mode,setMode]=useState<"welcome"|"login"|"signup">("welcome");
+  const [mode,setMode]=useState<"welcome"|"login"|"signup"|"forgot">("welcome");
   const [email,setEmail]=useState("");
   const [password,setPassword]=useState("");
   const [busy,setBusy]=useState(false);
@@ -114,7 +114,10 @@ function CandidateAuth({onAuthenticated}:{onAuthenticated:(email:string)=>void})
     event.preventDefault();
     setBusy(true);setError("");setNotice("");
     try{
-      if(mode==="login"){
+      if(mode==="forgot"){
+        await requestCandidatePasswordReset(email);
+        setNotice("إذا كان هذا البريد مسجلاً، فستصلك رسالة لإعادة تعيين كلمة المرور. تحقّق أيضاً من مجلد الرسائل غير المرغوب فيها.");
+      }else if(mode==="login"){
         const user=await signInCandidate(email,password);
         onAuthenticated(user.email??email.trim().toLowerCase());
       }else{
@@ -122,20 +125,21 @@ function CandidateAuth({onAuthenticated}:{onAuthenticated:(email:string)=>void})
         if(result.session&&result.user&&!result.user.is_anonymous){
           onAuthenticated(result.user.email??email.trim().toLowerCase());
         }else{
-          setNotice("يرجى تأكيد الرابط المرسل إلى بريدك الإلكتروني. يمكنك تسجيل الدخول بعد التحقق من عنوان البريد.");
+          setNotice("إذا كان الحساب جديداً، فقد أرسلنا رابط التأكيد. إذا كان البريد مسجلاً من قبل، استخدم «نسيت كلمة المرور؟» بدلاً من إعادة التسجيل.");
           setMode("login");
           setPassword("");
         }
       }
-    }catch{
-      setError(mode==="login"?"البريد الإلكتروني أو كلمة المرور غير صحيحة.":"تعذر إنشاء الحساب. قد يكون البريد الإلكتروني مسجلاً بالفعل.");
+    }catch(error){
+      console.error(error);
+      setError(mode==="forgot"?"تعذر إرسال رسالة إعادة تعيين كلمة المرور. انتظر دقيقة ثم حاول مرة أخرى.":mode==="login"?"البريد الإلكتروني أو كلمة المرور غير صحيحة.":"تعذر إنشاء الحساب. قد يكون البريد الإلكتروني مسجلاً بالفعل.");
     }finally{setBusy(false)}
   };
 
   if(mode==="welcome")return <main className="welcome-shell" dir="rtl" lang="ar"><section className="welcome-card"><Brand/><div className="welcome-visual" aria-hidden="true"><div className="passport-card"><span>MB</span><BadgeCheck/></div><div className="journey-line"><span>✦</span></div><div className="germany-card"><span>DE</span><Check/></div></div><div><p className="eyebrow">MEDIBRIDGE CAREERS</p><h1>{copy.ar.welcome}</h1><p className="lead">{copy.ar.welcomeText}</p></div><div className="welcome-actions"><button className="primary-button" onClick={()=>setMode("signup")}>{copy.ar.start}<ArrowRight size={18}/></button><button className="text-button" onClick={()=>setMode("login")}>{copy.ar.haveAccount}</button></div><p className="privacy-line"><ShieldCheck size={16}/>{copy.ar.privacy}</p></section></main>;
 
-  const login=mode==="login";
-  return <main className="welcome-shell" dir="rtl" lang="ar"><section className="welcome-card auth-card"><Brand/><button className="auth-back" type="button" onClick={()=>{setMode("welcome");setError("");setNotice("")}}><ArrowLeft size={18}/>رجوع</button><div className="auth-heading"><p className="eyebrow">MEDIBRIDGE CAREERS</p><h1>{login?"تسجيل الدخول":"إنشاء حساب"}</h1><p className="lead">{login?"استخدم بريدك الإلكتروني المسجل وكلمة المرور.":"أنشئ حسابك بأمان قبل إعداد ملف المرشح."}</p></div><form className="auth-form" onSubmit={submit}><label><span>البريد الإلكتروني</span><input type="email" autoComplete="email" required value={email} onChange={event=>setEmail(event.target.value)} placeholder="name@example.com"/></label><label><span>كلمة المرور</span><input type="password" autoComplete={login?"current-password":"new-password"} minLength={8} required value={password} onChange={event=>setPassword(event.target.value)} placeholder="8 أحرف على الأقل"/></label>{error&&<p className="auth-message error" role="alert">{error}</p>}{notice&&<p className="auth-message success" role="status">{notice}</p>}<button className="primary-button" disabled={busy} type="submit">{busy?"يرجى الانتظار…":login?"تسجيل الدخول":"إنشاء الحساب"}{!busy&&<ArrowRight size={18}/>}</button></form><button className="text-button" type="button" onClick={()=>{setMode(login?"signup":"login");setError("");setNotice("");setPassword("")}}>{login?"مستخدم جديد؟ أنشئ حساباً":"لديك حساب بالفعل؟ سجل الدخول"}</button><p className="privacy-line"><ShieldCheck size={16}/>لا يُسمح بالدخول إلا بعد تسجيل دخول ناجح عبر Supabase.</p></section></main>;
+  const login=mode==="login";const forgot=mode==="forgot";
+  return <main className="welcome-shell" dir="rtl" lang="ar"><section className="welcome-card auth-card"><Brand/><button className="auth-back" type="button" onClick={()=>{setMode(forgot?"login":"welcome");setError("");setNotice("")}}><ArrowLeft size={18}/>رجوع</button><div className="auth-heading"><p className="eyebrow">MEDIBRIDGE CAREERS</p><h1>{forgot?"إعادة تعيين كلمة المرور":login?"تسجيل الدخول":"إنشاء حساب"}</h1><p className="lead">{forgot?"أدخل بريدك الإلكتروني وسنرسل لك رابطاً آمناً لاختيار كلمة مرور جديدة.":login?"استخدم بريدك الإلكتروني المسجل وكلمة المرور.":"أنشئ حسابك بأمان قبل إعداد ملف المرشح."}</p></div><form className="auth-form" onSubmit={submit}><label><span>البريد الإلكتروني</span><input type="email" autoComplete="email" required value={email} onChange={event=>setEmail(event.target.value)} placeholder="name@example.com"/></label>{!forgot&&<label><span>كلمة المرور</span><input type="password" autoComplete={login?"current-password":"new-password"} minLength={8} required value={password} onChange={event=>setPassword(event.target.value)} placeholder="8 أحرف على الأقل"/></label>}{login&&<button className="auth-inline-link" type="button" onClick={()=>{setMode("forgot");setError("");setNotice("");setPassword("")}}>نسيت كلمة المرور؟</button>}{error&&<p className="auth-message error" role="alert">{error}</p>}{notice&&<p className="auth-message success" role="status">{notice}</p>}<button className="primary-button" disabled={busy} type="submit">{busy?"يرجى الانتظار…":forgot?"إرسال رابط إعادة التعيين":login?"تسجيل الدخول":"إنشاء الحساب"}{!busy&&<ArrowRight size={18}/>}</button></form>{!forgot&&<button className="text-button" type="button" onClick={()=>{setMode(login?"signup":"login");setError("");setNotice("");setPassword("")}}>{login?"مستخدم جديد؟ أنشئ حساباً":"لديك حساب بالفعل؟ سجل الدخول"}</button>}{login&&notice&&<button className="auth-inline-link centered" disabled={busy} type="button" onClick={async()=>{setBusy(true);setError("");try{await resendCandidateConfirmation(email);setNotice("إذا كان البريد بانتظار التأكيد، فقد أرسلنا رسالة جديدة.")}catch{setError("تعذر إعادة إرسال رسالة التأكيد الآن.")}finally{setBusy(false)}}}>إعادة إرسال رسالة التأكيد</button>}<p className="privacy-line"><ShieldCheck size={16}/>لا يُسمح بالدخول إلا بعد تسجيل دخول ناجح عبر Supabase.</p></section></main>;
 }
 
 function AuthenticatedApp({authenticatedEmail,onSignOut}:{authenticatedEmail:string;onSignOut:()=>Promise<void>}) {

@@ -8,6 +8,12 @@ export type JobPreferences={desired_role:string;preferred_region:string;possible
 export type CandidateWorkspace={candidate:null|{id:string;full_name:string|null;email:string|null;phone:string|null;nationality:string|null;residence:string|null;avatar_path:string|null;preferred_language:Language;status:CandidateStatus;reference_number:string|null;submitted_at:string|null};answers:Record<string,string>;documents:CandidateDocument[];preferences:JobPreferences};
 export const supabase=createClient(supabaseUrl,supabaseKey,{auth:{persistSession:true,autoRefreshToken:true}});
 
+function authRedirect(path:string){
+  const configured=process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/,"");
+  const origin=configured||(typeof window!=="undefined"?window.location.origin:"");
+  return `${origin}${path.startsWith("/")?path:`/${path}`}`;
+}
+
 export async function getAuthenticatedCandidate(){
   const {data,error}=await supabase.auth.getUser();
   if(error||!data.user)return null;
@@ -19,9 +25,34 @@ export async function getAuthenticatedCandidate(){
 }
 
 export async function registerCandidate(email:string,password:string){
-  const result=await supabase.auth.signUp({email:email.trim().toLowerCase(),password});
+  const result=await supabase.auth.signUp({
+    email:email.trim().toLowerCase(),
+    password,
+    options:{emailRedirectTo:authRedirect("/")}
+  });
   if(result.error)throw result.error;
   return result.data;
+}
+
+export async function resendCandidateConfirmation(email:string){
+  const result=await supabase.auth.resend({
+    type:"signup",
+    email:email.trim().toLowerCase(),
+    options:{emailRedirectTo:authRedirect("/")}
+  });
+  if(result.error)throw result.error;
+}
+
+export async function requestCandidatePasswordReset(email:string){
+  const result=await supabase.auth.resetPasswordForEmail(email.trim().toLowerCase(),{
+    redirectTo:authRedirect("/reset-password")
+  });
+  if(result.error)throw result.error;
+}
+
+export async function updateCandidatePassword(password:string){
+  const result=await supabase.auth.updateUser({password});
+  if(result.error)throw result.error;
 }
 
 export async function signInCandidate(email:string,password:string){
