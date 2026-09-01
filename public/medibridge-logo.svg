@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="430" height="64" viewBox="0 0 430 64" fill="none">
+  <g transform="translate(4 8)">
+    <circle cx="12" cy="40" r="8" fill="#FF6B54"/>
+    <circle cx="52" cy="40" r="8" fill="#0C9AB7"/>
+    <path d="M4 25C4 25 20 4 32 4C44 4 60 25 60 25" stroke="#073B47" stroke-width="4" stroke-linecap="round"/>
+  </g>
+  <text x="82" y="42" font-family="Arial, Helvetica, sans-serif" font-size="34" font-weight="700">
+    <tspan fill="#FF6B54">MediBridge</tspan><tspan fill="#0C9AB7"> Maghreb</tspan>
+  </text>
+</svg>
