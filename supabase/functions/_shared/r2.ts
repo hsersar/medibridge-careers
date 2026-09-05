@@ -55,6 +55,12 @@ export async function inspectObject(key: string) {
   return r2Client().send(new HeadObjectCommand({ Bucket: r2Bucket(), Key: key }));
 }
 
+export async function downloadObject(key: string) {
+  const result = await r2Client().send(new GetObjectCommand({ Bucket: r2Bucket(), Key: key }));
+  if (!result.Body) throw new Error("OBJECT_EMPTY");
+  return new Uint8Array(await result.Body.transformToByteArray());
+}
+
 export async function removeObject(key: string) {
   await r2Client().send(new DeleteObjectCommand({ Bucket: r2Bucket(), Key: key }));
 }
