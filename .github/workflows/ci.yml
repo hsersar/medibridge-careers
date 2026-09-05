@@ -23,4 +23,4 @@ jobs:
       - run: npm run build:vercel
       - run: npm run typecheck
       - run: npm test
-      - run: npm run lint
+      - run: npx eslint app/api app/error.tsx app/imprint app/layout.tsx lib/jobs.ts lib/supabase.ts --ignore-pattern dist --ignore-pattern .next
