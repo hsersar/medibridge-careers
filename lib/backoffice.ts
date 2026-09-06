@@ -68,6 +68,8 @@ export async function removeCandidateInterest(id:string){const result=await supa
 
 export async function reviewCandidateDocument(documentId:string,status:"pending"|"verified"|"rejected",note:string){const result=await supabase.from("candidate_documents").update({verification_status:status,verification_note:note||null,updated_at:new Date().toISOString()}).eq("id",documentId);if(result.error)throw result.error;await logAuditEvent("candidate_document.reviewed","candidate_documents",documentId,{status})}
 
+export class EmailDeliveryError extends Error{email:EmailLog;constructor(message:string,email:EmailLog){super(message);this.name="EmailDeliveryError";this.email=email}}
+
 export async function prepareCandidateEmail(candidateId:string,recipient:string,subject:string,body:string){
   const user=(await supabase.auth.getUser()).data.user;if(!user)throw new Error("UNAUTHENTICATED");
   const result=await supabase.from("candidate_emails").insert({candidate_id:candidateId,created_by:user.id,recipient,subject,body,status:"prepared"}).select("id,recipient,subject,body,status,created_at,sent_at").single();
@@ -82,7 +84,7 @@ export async function prepareCandidateEmail(candidateId:string,recipient:string,
   }catch(deliveryError){
     await logAuditEvent("candidate_email.failed","candidate_emails",created.id,{recipient,error:String(deliveryError)});
     const failed=await supabase.from("candidate_emails").select("id,recipient,subject,body,status,created_at,sent_at").eq("id",created.id).single();
-    return(failed.data??created) as EmailLog;
+    throw new EmailDeliveryError("EMAIL_DELIVERY_FAILED",(failed.data??created) as EmailLog);
   }
 }
 

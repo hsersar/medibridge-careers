@@ -2,7 +2,7 @@
 import {useEffect,useMemo,useState} from "react";
 import Link from "next/link";
 import {ArrowLeft,CheckCircle2,ChevronRight,ClipboardList,FileText,Filter,LogOut,Mail,MessageSquarePlus,Pencil,Plus,Save,Search,ShieldCheck,Trash2,UserRound,XCircle,type LucideIcon} from "lucide-react";
-import {addInternalNote,createCandidateInterest,getBackofficeSession,getCandidateActivity,listBackofficeCandidates,listCandidateInterests,listEmailTemplates,prepareCandidateEmail,removeCandidateInterest,reviewCandidateDocument,saveEmailTemplate,signInBackoffice,signOutBackoffice,updateCandidateInterest,updateCandidateProfile,updateCandidateStatus,type BackofficeCandidate,type BackofficeInterest,type BackofficeMembership,type EmailLog,type EmailTemplate,type InternalNote,type StatusHistoryEntry} from "@/lib/backoffice";
+import {addInternalNote,createCandidateInterest,EmailDeliveryError,getBackofficeSession,getCandidateActivity,listBackofficeCandidates,listCandidateInterests,listEmailTemplates,prepareCandidateEmail,removeCandidateInterest,reviewCandidateDocument,saveEmailTemplate,signInBackoffice,signOutBackoffice,updateCandidateInterest,updateCandidateProfile,updateCandidateStatus,type BackofficeCandidate,type BackofficeInterest,type BackofficeMembership,type EmailLog,type EmailTemplate,type InternalNote,type StatusHistoryEntry} from "@/lib/backoffice";
 import {listBackofficeJobs,type Job} from "@/lib/jobs";
 import {getCandidateDocumentUrl,type CandidateDocument,type CandidateStatus} from "@/lib/supabase";
 import "./backoffice.css";
@@ -192,6 +192,7 @@ function EmailTab({candidate,emails,onPrepared}:{candidate:BackofficeCandidate;e
   const [body,setBody]=useState("");
   const [busy,setBusy]=useState(false);
   const [editingTemplate,setEditingTemplate]=useState(false);
+  const [sendError,setSendError]=useState("");
 
   useEffect(()=>{listEmailTemplates().then(rows=>{setTemplates(rows);const first=rows[0];if(first){setTemplate(first.id);setSubject(first.subject);setBody(first.body.replace("{{name}}",candidate.full_name||""))}}).catch(()=>undefined)},[]);
 
@@ -204,8 +205,9 @@ function EmailTab({candidate,emails,onPrepared}:{candidate:BackofficeCandidate;e
     <label className="bo-field">Empfänger<input value={candidate.email||""} readOnly/></label>
     <label className="bo-field">Betreff<input value={subject} onChange={e=>setSubject(e.target.value)}/></label>
     <label className="bo-field">Nachricht<textarea rows={9} value={body} onChange={e=>setBody(e.target.value)}/></label>
+    {sendError&&<p className="bo-error">{sendError}</p>}
     <div className="bo-document-actions">
-      <button className="bo-primary" disabled={!candidate.email||!subject||!body||busy} onClick={async()=>{setBusy(true);try{onPrepared(await prepareCandidateEmail(candidate.id,candidate.email!,subject,body))}finally{setBusy(false)}}}><Mail/>E-Mail senden</button>
+      <button className="bo-primary" disabled={!candidate.email||!subject||!body||busy} onClick={async()=>{setBusy(true);setSendError("");try{onPrepared(await prepareCandidateEmail(candidate.id,candidate.email!,subject,body))}catch(deliveryError){if(deliveryError instanceof EmailDeliveryError){onPrepared(deliveryError.email);setSendError("Zustellung fehlgeschlagen. Die E-Mail wurde als \"failed\" protokolliert.")}else{setSendError("E-Mail konnte nicht vorbereitet werden.")}}finally{setBusy(false)}}}><Mail/>E-Mail senden</button>
       <button onClick={()=>setEditingTemplate(current=>!current)}><Pencil/>Vorlage bearbeiten</button>
     </div>
     {editingTemplate&&<button className="bo-primary" disabled={busy||!template} onClick={async()=>{const current=templates.find(x=>x.id===template);if(!current)return;setBusy(true);try{const saved=await saveEmailTemplate({id:current.id,key:current.key,label:current.label,subject,body});setTemplates(rows=>rows.map(row=>row.id===saved.id?saved:row));setEditingTemplate(false)}finally{setBusy(false)}}}><Save/>Vorlage speichern</button>}
