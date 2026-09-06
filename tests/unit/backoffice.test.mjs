@@ -246,7 +246,8 @@ test("listBackofficeCandidates strips characters that would break the PostgREST 
   const { listBackofficeCandidates } = await ctx.load("/lib/backoffice.ts");
   await listBackofficeCandidates({ query: "a,b(c)d%e_f" });
 
-  assert.equal(orFilter, "full_name.ilike.%abcdef%,email.ilike.%abcdef%,reference_number.ilike.%abcdef%,residence.ilike.%abcdef%");
+  const expectedLike = '"%a,b(c)d\\%e\\_f%"';
+  assert.equal(orFilter, `full_name.ilike.${expectedLike},email.ilike.${expectedLike},reference_number.ilike.${expectedLike},residence.ilike.${expectedLike}`);
 });
 
 test("countCandidatesByStatus issues a head-only count query", async (t) => {

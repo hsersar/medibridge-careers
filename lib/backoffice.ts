@@ -27,7 +27,8 @@ export async function listBackofficeCandidates(options:{query?:string;status?:st
   if(options.status&&options.status!=="all")request=request.eq("status",options.status);
   const trimmed=(options.query??"").trim();
   if(trimmed){
-    const like=`%${trimmed.replace(/[%_,()]/g,"")}%`;
+    const escaped=trimmed.replace(/\\/g,"\\\\").replace(/%/g,"\\%").replace(/_/g,"\\_");
+    const like=`"%${escaped.replace(/"/g,'\\"')}%"`;
     request=request.or(`full_name.ilike.${like},email.ilike.${like},reference_number.ilike.${like},residence.ilike.${like}`);
   }
   const candidates=await request.range(from,to);
@@ -108,4 +109,4 @@ export async function listPrivacyRequests(options:{status?:string}={}){let reque
 export async function updatePrivacyRequestStatus(id:string,status:"received"|"processing"|"completed"|"rejected"){const patch:Record<string,unknown>={status};if(status==="completed")patch.completed_at=new Date().toISOString();const result=await supabase.from("data_subject_requests").update(patch).eq("id",id);if(result.error)throw result.error;await logAuditEvent("privacy_request.updated","data_subject_requests",id,{status})}
 
 export async function listAuditLogs(options:{page?:number;pageSize?:number}={}){const page=Math.max(1,options.page??1);const pageSize=Math.max(1,options.pageSize??50);const from=(page-1)*pageSize;const to=from+pageSize-1;const result=await supabase.from("audit_logs").select("id,actor_id,action,entity_type,entity_id,metadata,created_at",{count:"exact"}).order("created_at",{ascending:false}).range(from,to);if(result.error)throw result.error;return{rows:(result.data??[]) as AuditLogEntry[],total:result.count??0}}
-export async function logAuditEvent(action:string,entityType:string,entityId:string,metadata:Record<string,unknown>){const user=(await supabase.auth.getUser()).data.user;if(!user)return;await supabase.from("audit_logs").insert({actor_id:user.id,action,entity_type:entityType,entity_id:entityId,metadata})}
+export async function logAuditEvent(action:string,entityType:string,entityId:string,metadata:Record<string,unknown>){const user=(await supabase.auth.getUser()).data.user;if(!user)return;const result=await supabase.from("audit_logs").insert({actor_id:user.id,action,entity_type:entityType,entity_id:entityId,metadata});if(result.error)console.error("logAuditEvent failed",action,entityType,entityId,result.error)}

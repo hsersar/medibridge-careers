@@ -33,6 +33,8 @@ begin
   if target_user_id is null then
     raise exception 'USER_NOT_FOUND';
   end if;
+  -- New users default display_name to their email when none is supplied; existing users keep
+  -- their current display_name unless target_display_name is explicitly provided.
   insert into public.backoffice_users (user_id, display_name, role)
   values (target_user_id, coalesce(target_display_name, target_email), target_role)
   on conflict (user_id) do update set role = excluded.role, display_name = coalesce(target_display_name, public.backoffice_users.display_name)
