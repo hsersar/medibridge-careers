@@ -25,13 +25,14 @@ production Supabase project.
 
 1. Feature branch is created off `main`; work happens in a PR.
 2. CI (`.github/workflows/ci.yml`) runs on every PR: `lint`, `typecheck`,
-   `unit-tests`, `build`, `migrations`, and (once staging exists and the
-   `E2E_ENABLED` repository variable is set) `e2e`. `legacy-build-tests` runs
-   informationally and does not block merges (see the comment in the
-   workflow file and `docs/database.md`'s sibling test docs for why).
+   `unit-tests`, `build`, `build-tests`, `migrations`, and (once staging
+   exists and the `E2E_ENABLED` repository variable is set) `e2e`.
+   `build-tests` verifies the built worker renders real MediBridge markup
+   (not generic starter-demo output) and is a required, blocking check (see
+   the comment in the workflow file).
 3. All required checks must pass (configure branch protection on `main` to
-   require `lint`, `typecheck`, `unit-tests`, `build`, and `migrations` — see
-   "Branch protection" below).
+   require `lint`, `typecheck`, `unit-tests`, `build`, `build-tests`, and
+   `migrations` — see "Branch protection" below).
 4. On merge to `main`:
    - Vercel automatically deploys the staging project from `main`.
    - Any new Supabase migrations are applied to the staging Supabase project
@@ -57,10 +58,10 @@ production Supabase project.
 
 Outside of the workflow file itself, configure the `main` branch protection
 rule (Settings → Branches) to require the following status checks before
-merging: `lint`, `typecheck`, `unit-tests`, `build`, `migrations`. Do not
-require `legacy-build-tests` (informational) or `e2e` (only meaningful once
-a staging environment and its secrets exist) until they are reliable enough
-to gate merges.
+merging: `lint`, `typecheck`, `unit-tests`, `build`, `build-tests`,
+`migrations`. Do not require `e2e` (only meaningful once a staging
+environment and its secrets exist) until it is reliable enough to gate
+merges.
 
 ## Rollback process
 
