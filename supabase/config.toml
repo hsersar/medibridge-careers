@@ -1,0 +1,31 @@
+# Supabase CLI project configuration.
+# Used locally (`supabase start`) and in CI (`npm run test:migrations`) to
+# spin up a disposable Postgres + Auth + Storage stack, apply every file in
+# supabase/migrations in order, and run the pgTAP suite in
+# supabase/tests/database. See docs/database.md for the full strategy.
+project_id = "medibridge-careers"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "storage", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+port = 54322
+major_version = 15
+
+[studio]
+enabled = false
+
+[auth]
+enabled = true
+site_url = "http://127.0.0.1:3000"
+additional_redirect_urls = ["http://127.0.0.1:3000"]
+jwt_expiry = 3600
+enable_signup = true
+
+[storage]
+enabled = true
+file_size_limit = "50MiB"
