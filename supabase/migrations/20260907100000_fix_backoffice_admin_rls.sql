@@ -6,3 +6,7 @@ drop policy if exists "Admins manage backoffice users" on public.backoffice_user
 create policy "Admins manage backoffice users" on public.backoffice_users for all
 using (public.is_backoffice_admin())
 with check (public.is_backoffice_admin());
+
+drop policy if exists "Admins read audit logs" on public.audit_logs;
+create policy "Admins read audit logs" on public.audit_logs for select
+using (public.is_backoffice_admin());
