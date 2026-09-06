@@ -86,6 +86,11 @@ export function curriculumVitaeFileName(answers:CvAnswers,generatedAt=new Date()
   return `lebenslauf-${slug||localIsoDate(generatedAt)}.html`;
 }
 
+/** Returns the fields needed before a candidate can create a useful CV. */
+export function curriculumVitaeMissingFields(answers:CvAnswers){
+  return (["fullName","birthDate","targetRole"] as const).filter(field=>!(answers[field]??"").trim());
+}
+
 /** Renders a printable German-style CV document; all candidate values are HTML escaped. */
 export function buildCurriculumVitaeHtml(answers:CvAnswers,language:CvLanguage,generatedAt=new Date()){
   const labels=cvCopy[language];
