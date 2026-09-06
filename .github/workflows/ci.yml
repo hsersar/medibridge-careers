@@ -58,6 +58,9 @@ jobs:
           node-version: 22
       - run: npm install --no-audit --no-fund
       - run: npm run build:vercel
+      - run: npm run typecheck
+      - run: npm test
+      - run: npx eslint app/api app/error.tsx app/imprint app/layout.tsx lib/jobs.ts lib/supabase.ts --ignore-pattern dist --ignore-pattern .next
 
   build-tests:
     # tests/build/* checks that the built vinext worker renders real

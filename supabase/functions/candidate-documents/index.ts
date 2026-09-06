@@ -3,6 +3,7 @@ import { withSupabase } from "jsr:@supabase/server@^1";
 import { corsHeaders } from "../_shared/cors.ts";
 import {
   inspectObject,
+  downloadObject,
   r2Bucket,
   removeObject,
   signDownload,
@@ -23,6 +24,21 @@ function json(request: Request, body: unknown, status = 200) {
 
 function safeName(name: string) {
   return name.normalize("NFKC").replace(/[^a-zA-Z0-9._-]/g, "-").slice(-140) || "document";
+}
+
+async function scanObject(key: string, mimeType: string) {
+  const scanner = Deno.env.get("DOCUMENT_SCANNER_URL");
+  const token = Deno.env.get("DOCUMENT_SCANNER_TOKEN");
+  if (!scanner || !token) throw new Error("DOCUMENT_SCANNER_NOT_CONFIGURED");
+  const response = await fetch(scanner, {
+    method: "POST",
+    headers: { Authorization: "Bearer " + token, "Content-Type": mimeType },
+    body: await downloadObject(key),
+  });
+  if (!response.ok) throw new Error("DOCUMENT_SCANNER_FAILED");
+  const result = await response.json().catch(() => ({}));
+  if (result.clean !== true) throw new Error("MALWARE_DETECTED");
+  return String(result.provider ?? "external-scanner");
 }
 
 const authenticated = withSupabase({ auth: "user" }, async (request, ctx) => {
@@ -71,6 +87,13 @@ const authenticated = withSupabase({ auth: "user" }, async (request, ctx) => {
         await removeObject(key);
         return json(request, { error: "OBJECT_VALIDATION_FAILED" }, 400);
       }
+      let scanProvider = "";
+      try {
+        scanProvider = await scanObject(key, mimeType);
+      } catch (error) {
+        await removeObject(key);
+        return json(request, { error: error instanceof Error && error.message === "MALWARE_DETECTED" ? "MALWARE_DETECTED" : "DOCUMENT_SCAN_FAILED" }, 422);
+      }
       const existing = await client.from("candidate_documents").select(selection).eq("storage_path", key).maybeSingle();
       if (existing.error) throw existing.error;
       if (existing.data) return json(request, { document: existing.data });
@@ -84,6 +107,9 @@ const authenticated = withSupabase({ auth: "user" }, async (request, ctx) => {
         mime_type: mimeType,
         file_size: fileSize,
         verification_status: "pending",
+        scan_status: "clean",
+        scanned_at: new Date().toISOString(),
+        scan_provider: scanProvider,
       }).select(selection).single();
       if (inserted.error) {
         await removeObject(key);

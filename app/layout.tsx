@@ -4,6 +4,7 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "MediBridge Careers",
   description: "Your trusted path to a healthcare career in Germany.",
+  other: { "codex-preview": "development" },
   icons: { icon: "/favicon.svg", shortcut: "/favicon.svg" },
 };
 

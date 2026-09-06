@@ -94,3 +94,9 @@ export async function submitCandidateIntake({answers,documentFiles,language}:{an
 export async function getCandidateAvatarUrl(path:string|null){if(!path)return"";const result=await supabase.storage.from("candidate-avatars").createSignedUrl(path,3600);if(result.error)throw result.error;return result.data.signedUrl}
 export async function uploadCandidateAvatar(file:File){const user=await requireCandidateUser();if(file.size>5*1024*1024)throw new Error("FILE_TOO_LARGE");if(!["image/jpeg","image/png","image/webp"].includes(file.type))throw new Error("INVALID_FILE_TYPE");const current=await supabase.from("candidates").select("avatar_path").eq("id",user.id).maybeSingle();const extension=file.name.split(".").pop()?.toLowerCase()||"jpg";const path=`${user.id}/avatar-${crypto.randomUUID()}.${extension}`;const upload=await supabase.storage.from("candidate-avatars").upload(path,file,{upsert:false});if(upload.error)throw upload.error;const update=await supabase.from("candidates").update({avatar_path:path,updated_at:new Date().toISOString()}).eq("id",user.id);if(update.error){await supabase.storage.from("candidate-avatars").remove([path]);throw update.error}if(current.data?.avatar_path)await supabase.storage.from("candidate-avatars").remove([current.data.avatar_path]);return{path,url:await getCandidateAvatarUrl(path)}}
 export async function deleteCandidateAvatar(path:string|null){const user=await requireCandidateUser();if(path){const removed=await supabase.storage.from("candidate-avatars").remove([path]);if(removed.error)throw removed.error}const update=await supabase.from("candidates").update({avatar_path:null,updated_at:new Date().toISOString()}).eq("id",user.id);if(update.error)throw update.error}
+
+export async function reportClientError(error:Error,route:string){
+  const user=(await supabase.auth.getUser()).data.user;
+  if(!user)return;
+  await supabase.from("app_errors").insert({user_id:user.id,route,message:error.message,stack:error.stack});
+}
