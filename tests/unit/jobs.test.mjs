@@ -91,6 +91,66 @@ test("listMyInterests scopes the query to the authenticated candidate", async (t
   assert.deepEqual(capturedFilter, ["candidate_id", "candidate-1"]);
 });
 
+test("listCandidateApplications returns the candidate's applications by latest update", async (t) => {
+  const ctx = await createTestContext();
+  t.after(() => ctx.close());
+
+  let capturedFilter = null;
+  ctx.mockSupabase({
+    auth: { getUser: async () => ({ data: { user: { id: "candidate-1" } } }) },
+    from: () => ({
+      select: () => ({
+        eq: (column, value) => {
+          capturedFilter = [column, value];
+          return {
+            order: () => createQueryChain({
+              data: [{ id: "application-1", job_id: "job-1", status: "reviewing" }],
+              error: null,
+            }),
+          };
+        },
+      }),
+    }),
+  });
+
+  const { listCandidateApplications } = await ctx.load("/lib/jobs.ts");
+  const applications = await listCandidateApplications();
+
+  assert.deepEqual(capturedFilter, ["candidate_id", "candidate-1"]);
+  assert.equal(applications[0].status, "reviewing");
+});
+
+test("applyForJob upserts a submitted application for the authenticated candidate", async (t) => {
+  const ctx = await createTestContext();
+  t.after(() => ctx.close());
+
+  let payload = null;
+  ctx.mockSupabase({
+    auth: { getUser: async () => ({ data: { user: { id: "candidate-1" } } }) },
+    from: () => ({
+      upsert: (value) => {
+        payload = value;
+        return {
+          select: () => ({
+            single: () => createQueryChain({
+              data: { id: "application-1", job_id: "job-1", status: "submitted" },
+              error: null,
+            }),
+          }),
+        };
+      },
+    }),
+  });
+
+  const { applyForJob } = await ctx.load("/lib/jobs.ts");
+  const application = await applyForJob("job-1");
+
+  assert.equal(payload.candidate_id, "candidate-1");
+  assert.equal(payload.job_id, "job-1");
+  assert.equal(payload.status, "submitted");
+  assert.equal(application.id, "application-1");
+});
+
 test("expressJobInterest requires an authenticated candidate", async (t) => {
   const ctx = await createTestContext();
   t.after(() => ctx.close());

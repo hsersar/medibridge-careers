@@ -65,4 +65,6 @@ test("builds the candidate dashboard and jobs-admin styles", async () => {
   assert.match(css, /\.jobs-admin\{/);
   // Candidate privacy/data-subject request page (app/privacy).
   assert.match(css, /\.privacy-page\{/);
+  assert.match(css, /\.application-card\{/);
+  assert.match(css, /\.application-status\{/);
 });
