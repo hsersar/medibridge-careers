@@ -165,30 +165,27 @@ test("updateCandidateStatus requires an authenticated staff user", async (t) => 
   );
 });
 
-test("updateCandidateStatus records status history for the authenticated staff user", async (t) => {
+test("updateCandidateStatus calls the transactional status RPC for the authenticated staff user", async (t) => {
   const ctx = await createTestContext();
   t.after(() => ctx.close());
 
   const calls = [];
   ctx.mockSupabase({
     auth: { getUser: async () => ({ data: { user: { id: "staff-1" } } }) },
-    from: (table) => ({
-      update: (payload) => {
-        calls.push({ table, payload });
-        return { eq: () => createQueryChain({ data: null, error: null }) };
-      },
-      insert: (payload) => {
-        calls.push({ table, payload });
-        return createQueryChain({ data: null, error: null });
-      },
-    }),
+    rpc: (name, params) => {
+      calls.push({ name, params });
+      return createQueryChain({ data: null, error: null });
+    },
   });
 
   const { updateCandidateStatus } = await ctx.load("/lib/backoffice.ts");
   await updateCandidateStatus("candidate-1", "submitted", "verified", "looks good");
 
-  const historyCall = calls.find((call) => call.table === "candidate_status_history");
-  assert.equal(historyCall.payload.changed_by, "staff-1");
-  assert.equal(historyCall.payload.previous_status, "submitted");
-  assert.equal(historyCall.payload.new_status, "verified");
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].name, "update_candidate_status");
+  assert.deepEqual(calls[0].params, {
+    candidate_id: "candidate-1",
+    new_status: "verified",
+    note: "looks good",
+  });
 });
