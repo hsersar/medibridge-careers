@@ -173,6 +173,7 @@ test("submitCandidateIntake stamps a submission reference and marks the candidat
         eq: () => ({ maybeSingle: () => createQueryChain({ data: { status: "draft" }, error: null }) }),
       }),
       upsert: () => createQueryChain({ data: null, error: null }),
+      insert: () => createQueryChain({ data: null, error: null }),
       update: (payload) => {
         updates.push({ table, payload });
         return { eq: () => createQueryChain({ data: null, error: null }) };
