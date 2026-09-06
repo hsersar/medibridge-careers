@@ -54,6 +54,27 @@ production Supabase project.
 7. Re-verify production immediately after promotion using the environment
    checklist in `docs/environment-checklist.md`.
 
+### Automated production deployment
+
+`.github/workflows/deploy-production.yml` runs on pushes to `main` or by
+manual dispatch. It builds the application, applies production migrations,
+deploys every Supabase Edge Function, and then deploys the linked Vercel
+project.
+
+Configure these secrets in the repository's `production` environment before
+running it:
+
+- `SUPABASE_DATABASE_URL`
+- `SUPABASE_ACCESS_TOKEN`
+- `SUPABASE_PROJECT_REF`
+- `VERCEL_TOKEN`
+- `VERCEL_ORG_ID`
+- `VERCEL_PROJECT_ID`
+
+The production Vercel environment variables and Supabase Edge Function
+secrets listed in `docs/environment-checklist.md` remain separate from these
+deployment credentials and must be configured before promotion.
+
 ### Branch protection
 
 Outside of the workflow file itself, configure the `main` branch protection
