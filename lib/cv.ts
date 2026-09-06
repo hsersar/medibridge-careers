@@ -28,9 +28,12 @@ const cvCopy={
     passport:"جواز السفر",visa:"وضع التأشيرة / الإقامة",relocation:"الاستعداد للانتقال"}
 } as const;
 
-type CvLabelKey=keyof typeof cvCopy["de"];
+type CvSectionKey="personal"|"goal"|"education"|"experience"|"languages"|"mobility";
+type CvFieldKey=Exclude<keyof typeof cvCopy["de"],CvSectionKey|"document"|"generated">;
 
-const sectionFields:{key:CvLabelKey;fields:CvLabelKey[]}[]=[
+const dateFields=new Set<CvFieldKey>(["birthDate"]);
+
+const sectionFields:{key:CvSectionKey;fields:CvFieldKey[]}[]=[
   {key:"personal",fields:["birthDate","birthPlace","nationality","residence","phone","email"]},
   {key:"goal",fields:["targetRole","start","facility"]},
   {key:"education",fields:["qualification","school","graduation","recognition"]},
@@ -66,14 +69,18 @@ export function buildCurriculumVitaeSections(answers:CvAnswers,language:CvLangua
     for(const field of section.fields){
       const raw=(answers[field]??"").trim();
       if(!raw)continue;
-      rows.push({label:labels[field],value:field==="birthDate"?formatCvDate(raw,language):raw});
+      rows.push({label:labels[field],value:dateFields.has(field)?formatCvDate(raw,language):raw});
     }
     if(rows.length)sections.push({title:labels[section.key],rows});
   }
   return sections;
 }
 
-/** Derives a safe download file name from the candidate name, falling back to a generic name. */
+/**
+ * Derives a safe download file name from the candidate name. Names written in a
+ * non-Latin script (for example Arabic) cannot be transliterated here, so the
+ * generation date is used instead of the name.
+ */
 export function curriculumVitaeFileName(answers:CvAnswers,generatedAt=new Date()){
   const slug=(answers.fullName??"").normalize("NFKD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-zA-Z0-9]+/g,"-").replace(/^-+|-+$/g,"").toLowerCase();
   return `lebenslauf-${slug||localIsoDate(generatedAt)}.html`;
