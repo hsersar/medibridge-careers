@@ -59,18 +59,13 @@ jobs:
       - run: npm install --no-audit --no-fund
       - run: npm run build:vercel
 
-  legacy-build-tests:
-    # tests/build/* predates this CI overhaul and checks generic
-    # build/render output rather than MediBridge business logic (see
-    # docs/database.md, README "Tests" section, and problem statement
-    # point 3). Two of its five assertions only pass inside the OpenAI
-    # "Sites" sandbox platform (a codex-preview <meta> tag) or when vendored
-    # shadcn/UI-kit demo components are rendered somewhere in the app (they
-    # currently are not), so this job is informational only and must not
-    # block merges until those tests are rewritten or removed.
+  build-tests:
+    # tests/build/* checks that the built vinext worker renders real
+    # MediBridge markup (candidate landing page, dashboard/intake progress
+    # bars, backoffice jobs admin, privacy page) rather than generic
+    # starter-demo output, so it is a required, blocking check.
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    continue-on-error: true
     needs: build
     steps:
       - uses: actions/checkout@v4

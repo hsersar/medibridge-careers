@@ -49,7 +49,7 @@ postings.
 | `npm run lint` | ESLint over the whole repo. |
 | `npm run typecheck` | `tsc --noEmit`. |
 | `npm run test:unit` | Business-logic tests (`tests/unit/`) and static RLS-policy coverage (`tests/security/`) — fast, no external services. |
-| `npm run test:build` | Legacy generic build/render checks (`tests/build/`); informational in CI, see `.github/workflows/ci.yml`. |
+| `npm run test:build` | Verifies the built vinext worker renders real MediBridge pages (`tests/build/`); required in CI, see `.github/workflows/ci.yml`. |
 | `npm run test` | Build, then run all of the above test suites. |
 | `npm run test:migrations` | Apply `supabase/migrations/` to a fresh local Supabase stack and run the pgTAP RLS suite (`supabase/tests/database/`); requires Docker and the Supabase CLI. See `docs/database.md`. |
 | `npm run test:e2e` | Playwright suite (`e2e/`) against a seeded staging/local instance; see `docs/deployment.md`. |
