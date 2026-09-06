@@ -45,10 +45,14 @@ select is(
   'Candidate A only sees their own intake answers'
 );
 
-select throws_ok(
-  $$ update public.candidates set full_name = 'Hijacked' where id = '22222222-2222-2222-2222-222222222222' $$,
-  null,
-  null,
+select is(
+  (with updated as (
+    update public.candidates
+    set full_name = 'Hijacked'
+    where id = '22222222-2222-2222-2222-222222222222'
+    returning id
+  ) select count(*)::int from updated),
+  0,
   'Candidate A cannot update Candidate B''s profile'
 );
 
