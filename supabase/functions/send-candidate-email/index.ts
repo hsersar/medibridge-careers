@@ -39,7 +39,7 @@ const authenticated = withSupabase({ auth: "user" }, async (request, ctx) => {
     if (existing.error || !existing.data) return json(request, { error: "EMAIL_NOT_FOUND" }, 404);
     if (existing.data.status === "sent") return json(request, { email: existing.data });
 
-    try{
+    try {
       await deliver(existing.data.recipient, existing.data.subject, existing.data.body);
     } catch (deliveryError) {
       console.error(deliveryError);

@@ -2,7 +2,7 @@
 import {useEffect,useMemo,useState} from "react";
 import Link from "next/link";
 import {ArrowLeft,CheckCircle2,ChevronRight,ClipboardList,FileText,Filter,LogOut,Mail,MessageSquarePlus,Pencil,Plus,Save,Search,ShieldCheck,Trash2,UserRound,XCircle,type LucideIcon} from "lucide-react";
-import {addInternalNote,createCandidateInterest,EmailDeliveryError,getBackofficeSession,getCandidateActivity,listBackofficeCandidates,listCandidateInterests,listEmailTemplates,prepareCandidateEmail,removeCandidateInterest,reviewCandidateDocument,saveEmailTemplate,signInBackoffice,signOutBackoffice,updateCandidateInterest,updateCandidateProfile,updateCandidateStatus,type BackofficeCandidate,type BackofficeInterest,type BackofficeMembership,type EmailLog,type EmailTemplate,type InternalNote,type StatusHistoryEntry} from "@/lib/backoffice";
+import {addInternalNote,countCandidatesByStatus,createCandidateInterest,EmailDeliveryError,getBackofficeSession,getCandidateActivity,listBackofficeCandidates,listCandidateInterests,listEmailTemplates,prepareCandidateEmail,removeCandidateInterest,reviewCandidateDocument,saveEmailTemplate,signInBackoffice,signOutBackoffice,updateCandidateInterest,updateCandidateProfile,updateCandidateStatus,type BackofficeCandidate,type BackofficeInterest,type BackofficeMembership,type EmailLog,type EmailTemplate,type InternalNote,type StatusHistoryEntry} from "@/lib/backoffice";
 import {listBackofficeJobs,type Job} from "@/lib/jobs";
 import {getCandidateDocumentUrl,type CandidateDocument,type CandidateStatus} from "@/lib/supabase";
 import "./backoffice.css";
@@ -32,10 +32,10 @@ export default function BackofficePage(){
       setTotal(result.total);
       if(!selectedId&&result.rows[0])setSelectedId(result.rows[0].id);
       const [reviewCount,verifiedCount]=await Promise.all([
-        listBackofficeCandidates({status:"under_review",page:1,pageSize:1}),
-        listBackofficeCandidates({status:"verified",page:1,pageSize:1}),
+        countCandidatesByStatus("under_review"),
+        countCandidatesByStatus("verified"),
       ]);
-      setStatusCounts({under_review:reviewCount.total,verified:verifiedCount.total});
+      setStatusCounts({under_review:reviewCount,verified:verifiedCount});
     }catch{
       setError("Kandidaten konnten nicht geladen werden.");
     }finally{

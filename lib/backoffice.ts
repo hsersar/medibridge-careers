@@ -27,7 +27,7 @@ export async function listBackofficeCandidates(options:{query?:string;status?:st
   if(options.status&&options.status!=="all")request=request.eq("status",options.status);
   const trimmed=(options.query??"").trim();
   if(trimmed){
-    const like=`%${trimmed.replace(/[%_]/g,"")}%`;
+    const like=`%${trimmed.replace(/[%_,()]/g,"")}%`;
     request=request.or(`full_name.ilike.${like},email.ilike.${like},reference_number.ilike.${like},residence.ilike.${like}`);
   }
   const candidates=await request.range(from,to);
@@ -39,6 +39,12 @@ export async function listBackofficeCandidates(options:{query?:string;status?:st
   if(documents.error)throw documents.error;
   const rows=(candidates.data??[]).map(candidate=>({...candidate,answers:(intakes.data?.find(x=>x.candidate_id===candidate.id)?.answers??{}) as Record<string,string>,documents:(documents.data??[]).filter(x=>x.candidate_id===candidate.id) as CandidateDocument[]})) as BackofficeCandidate[];
   return{rows,total:candidates.count??rows.length};
+}
+
+export async function countCandidatesByStatus(status:string):Promise<number>{
+  const result=await supabase.from("candidates").select("id",{count:"exact",head:true}).eq("status",status);
+  if(result.error)throw result.error;
+  return result.count??0;
 }
 
 export async function updateCandidateProfile(candidateId:string,patch:{full_name?:string|null;phone?:string|null;nationality?:string|null;residence?:string|null;preferred_language?:"en"|"de"|"ar"},answers?:Record<string,string>){

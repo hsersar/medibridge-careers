@@ -189,3 +189,111 @@ test("updateCandidateStatus calls the transactional status RPC for the authentic
     note: "looks good",
   });
 });
+
+test("listBackofficeCandidates paginates using range() derived from page and pageSize", async (t) => {
+  const ctx = await createTestContext();
+  t.after(() => ctx.close());
+
+  const calls = [];
+  ctx.mockSupabase({
+    from: (table) => {
+      if (table === "candidates") {
+        return {
+          select: () => ({
+            order: () => ({
+              range: (from, to) => {
+                calls.push({ from, to });
+                return createQueryChain({ data: [], error: null, count: 0 });
+              },
+            }),
+          }),
+        };
+      }
+      return { select: () => ({ in: () => createQueryChain({ data: [], error: null }) }) };
+    },
+  });
+
+  const { listBackofficeCandidates } = await ctx.load("/lib/backoffice.ts");
+  const result = await listBackofficeCandidates({ page: 3, pageSize: 10 });
+
+  assert.deepEqual(calls[0], { from: 20, to: 29 });
+  assert.deepEqual(result, { rows: [], total: 0 });
+});
+
+test("listBackofficeCandidates strips characters that would break the PostgREST or() filter", async (t) => {
+  const ctx = await createTestContext();
+  t.after(() => ctx.close());
+
+  let orFilter = "";
+  ctx.mockSupabase({
+    from: (table) => {
+      if (table === "candidates") {
+        return {
+          select: () => ({
+            order: () => ({
+              or: (filter) => {
+                orFilter = filter;
+                return { range: () => createQueryChain({ data: [], error: null, count: 0 }) };
+              },
+            }),
+          }),
+        };
+      }
+      return { select: () => ({ in: () => createQueryChain({ data: [], error: null }) }) };
+    },
+  });
+
+  const { listBackofficeCandidates } = await ctx.load("/lib/backoffice.ts");
+  await listBackofficeCandidates({ query: "a,b(c)d%e_f" });
+
+  assert.equal(orFilter, "full_name.ilike.%abcdef%,email.ilike.%abcdef%,reference_number.ilike.%abcdef%,residence.ilike.%abcdef%");
+});
+
+test("countCandidatesByStatus issues a head-only count query", async (t) => {
+  const ctx = await createTestContext();
+  t.after(() => ctx.close());
+
+  const calls = [];
+  ctx.mockSupabase({
+    from: (table) => ({
+      select: (columns, options) => {
+        calls.push({ table, columns, options });
+        return { eq: () => createQueryChain({ data: null, error: null, count: 7 }) };
+      },
+    }),
+  });
+
+  const { countCandidatesByStatus } = await ctx.load("/lib/backoffice.ts");
+  const count = await countCandidatesByStatus("verified");
+
+  assert.equal(count, 7);
+  assert.deepEqual(calls[0].options, { count: "exact", head: true });
+});
+
+test("updateCandidateProfile updates candidates and, when provided, candidate_intakes", async (t) => {
+  const ctx = await createTestContext();
+  t.after(() => ctx.close());
+
+  const calls = [];
+  ctx.mockSupabase({
+    auth: { getUser: async () => ({ data: { user: { id: "staff-1" } } }) },
+    from: (table) => ({
+      update: (payload) => {
+        calls.push({ table, payload });
+        return { eq: () => createQueryChain({ data: null, error: null }) };
+      },
+      insert: (payload) => {
+        calls.push({ table, payload });
+        return createQueryChain({ data: null, error: null });
+      },
+    }),
+  });
+
+  const { updateCandidateProfile } = await ctx.load("/lib/backoffice.ts");
+  await updateCandidateProfile("candidate-1", { full_name: "New Name" }, { targetRole: "Nurse" });
+
+  const candidateUpdate = calls.find((call) => call.table === "candidates");
+  const intakeUpdate = calls.find((call) => call.table === "candidate_intakes");
+  assert.equal(candidateUpdate.payload.full_name, "New Name");
+  assert.deepEqual(intakeUpdate.payload.answers, { targetRole: "Nurse" });
+});
