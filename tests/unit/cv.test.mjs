@@ -69,6 +69,10 @@ test("curriculumVitaeFileName builds a safe slug", async (t) => {
   const { curriculumVitaeFileName } = await loadCv(t);
 
   assert.equal(curriculumVitaeFileName(answers), "lebenslauf-amira-ben-salah.html");
-  assert.equal(curriculumVitaeFileName({ fullName: "  ../ " }), "lebenslauf-medibridge.html");
-  assert.equal(curriculumVitaeFileName({}), "lebenslauf-medibridge.html");
+  assert.equal(curriculumVitaeFileName({ fullName: "Jürgen Müller" }), "lebenslauf-jurgen-muller.html");
+  assert.equal(
+    curriculumVitaeFileName({ fullName: "  ../ " }, new Date(2026, 8, 6)),
+    "lebenslauf-2026-09-06.html",
+  );
+  assert.match(curriculumVitaeFileName({}), /^lebenslauf-\d{4}-\d{2}-\d{2}\.html$/);
 });

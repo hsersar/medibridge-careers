@@ -28,7 +28,9 @@ const cvCopy={
     passport:"جواز السفر",visa:"وضع التأشيرة / الإقامة",relocation:"الاستعداد للانتقال"}
 } as const;
 
-const sectionFields:{key:keyof typeof cvCopy["de"];fields:string[]}[]=[
+type CvLabelKey=keyof typeof cvCopy["de"];
+
+const sectionFields:{key:CvLabelKey;fields:CvLabelKey[]}[]=[
   {key:"personal",fields:["birthDate","birthPlace","nationality","residence","phone","email"]},
   {key:"goal",fields:["targetRole","start","facility"]},
   {key:"education",fields:["qualification","school","graduation","recognition"]},
@@ -64,7 +66,7 @@ export function buildCurriculumVitaeSections(answers:CvAnswers,language:CvLangua
     for(const field of section.fields){
       const raw=(answers[field]??"").trim();
       if(!raw)continue;
-      rows.push({label:labels[field as keyof typeof labels],value:field==="birthDate"?formatCvDate(raw,language):raw});
+      rows.push({label:labels[field],value:field==="birthDate"?formatCvDate(raw,language):raw});
     }
     if(rows.length)sections.push({title:labels[section.key],rows});
   }
@@ -72,16 +74,16 @@ export function buildCurriculumVitaeSections(answers:CvAnswers,language:CvLangua
 }
 
 /** Derives a safe download file name from the candidate name, falling back to a generic name. */
-export function curriculumVitaeFileName(answers:CvAnswers){
+export function curriculumVitaeFileName(answers:CvAnswers,generatedAt=new Date()){
   const slug=(answers.fullName??"").normalize("NFKD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-zA-Z0-9]+/g,"-").replace(/^-+|-+$/g,"").toLowerCase();
-  return `lebenslauf-${slug||"medibridge"}.html`;
+  return `lebenslauf-${slug||localIsoDate(generatedAt)}.html`;
 }
 
 /** Renders a printable German-style CV document; all candidate values are HTML escaped. */
 export function buildCurriculumVitaeHtml(answers:CvAnswers,language:CvLanguage,generatedAt=new Date()){
   const labels=cvCopy[language];
   const rtl=language==="ar";
-  const name=(answers.fullName??"").trim()||labels.document;
+  const name=(answers.fullName??"").trim();
   const headline=(answers.targetRole??"").trim();
   const sections=buildCurriculumVitaeSections(answers,language);
   const created=`${labels.generated} ${formatCvDate(localIsoDate(generatedAt),language)}`;
@@ -96,7 +98,7 @@ ${section.rows.map(row=>`          <div><dt>${escapeHtml(row.label)}</dt><dd>${e
   <head>
     <meta charset="utf-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1"/>
-    <title>${escapeHtml(labels.document)} – ${escapeHtml(name)}</title>
+    <title>${escapeHtml(name?`${labels.document} – ${name}`:labels.document)}</title>
     <style>
       *{box-sizing:border-box}
       body{margin:0;padding:32px;font-family:"Segoe UI",Arial,sans-serif;color:#12212f;background:#f5f7fa}
@@ -117,7 +119,7 @@ ${section.rows.map(row=>`          <div><dt>${escapeHtml(row.label)}</dt><dd>${e
   <body>
     <main>
       <header>
-        <h1>${escapeHtml(name)}</h1>
+        <h1>${escapeHtml(name||labels.document)}</h1>
         ${headline?`<p>${escapeHtml(headline)}</p>`:""}
       </header>
 ${body}
