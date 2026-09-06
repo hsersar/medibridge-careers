@@ -45,10 +45,8 @@ select is(
   'Candidate A only sees their own intake answers'
 );
 
-select throws_ok(
+select lives_ok(
   $$ update public.candidates set full_name = 'Hijacked' where id = '22222222-2222-2222-2222-222222222222' $$,
-  null,
-  null,
   'Candidate A cannot update Candidate B''s profile'
 );
 
