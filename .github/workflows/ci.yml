@@ -8,8 +8,47 @@ on:
 permissions:
   contents: read
 
+env:
+  NPM_CONFIG_CACHE: ${{ github.workspace }}/.npm-cache
+
 jobs:
-  quality:
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install --no-audit --no-fund
+      - run: npm run lint
+
+  typecheck:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install --no-audit --no-fund
+      - run: npm run typecheck
+
+  unit-tests:
+    name: Unit & security tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install --no-audit --no-fund
+      # Business-logic (lib/jobs.ts, lib/backoffice.ts, lib/supabase.ts) and
+      # static RLS-policy coverage tests. Fast, no external services needed.
+      - run: npm run test:unit
+
+  build:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -18,6 +57,60 @@ jobs:
         with:
           node-version: 22
       - run: npm install --no-audit --no-fund
-        env:
-          NPM_CONFIG_CACHE: ${{ runner.temp }}/npm-cache
       - run: npm run build:vercel
+
+  legacy-build-tests:
+    # tests/build/* predates this CI overhaul and checks generic
+    # build/render output rather than MediBridge business logic (see
+    # docs/database.md, README "Tests" section, and problem statement
+    # point 3). Two of its five assertions only pass inside the OpenAI
+    # "Sites" sandbox platform (a codex-preview <meta> tag) or when vendored
+    # shadcn/UI-kit demo components are rendered somewhere in the app (they
+    # currently are not), so this job is informational only and must not
+    # block merges until those tests are rewritten or removed.
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    continue-on-error: true
+    needs: build
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install --no-audit --no-fund
+      - run: npm run build
+      - run: npm run test:build
+
+  migrations:
+    name: Supabase migration & RLS tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - run: npm run test:migrations
+
+  e2e:
+    name: End-to-end tests (Playwright)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: build
+    if: ${{ vars.E2E_ENABLED == 'true' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install --no-audit --no-fund
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e
+        env:
+          PLAYWRIGHT_BASE_URL: ${{ vars.STAGING_URL }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ vars.STAGING_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ vars.STAGING_SUPABASE_PUBLISHABLE_KEY }}
+          E2E_CANDIDATE_EMAIL: ${{ secrets.E2E_CANDIDATE_EMAIL }}
+          E2E_CANDIDATE_PASSWORD: ${{ secrets.E2E_CANDIDATE_PASSWORD }}
+          E2E_STAFF_EMAIL: ${{ secrets.E2E_STAFF_EMAIL }}
+          E2E_STAFF_PASSWORD: ${{ secrets.E2E_STAFF_PASSWORD }}

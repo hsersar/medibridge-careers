@@ -1,15 +1,80 @@
-# vinext-starter
+# MediBridge Careers
 
-A clean full-stack starter running on
-[vinext](https://github.com/cloudflare/vinext), with optional Cloudflare D1 and
-Drizzle support.
+MediBridge Careers is the candidate and backoffice portal for MediBridge
+Maghreb: candidates apply, upload documents, and track their status, while
+MediBridge staff review applications, verify documents, and manage job
+postings.
+
+- **Candidate app** (`app/page.tsx`, `app/privacy`, `app/reset-password`):
+  application intake, document upload, job interest, status tracking, and
+  privacy/data-subject requests (access, correction, deletion, consent
+  withdrawal).
+- **Backoffice app** (`app/backoffice`, `app/backoffice/jobs`): staff login
+  gated by a `backoffice_users` row, candidate pool review, document
+  verification, internal notes, status changes, and job posting management.
+- **Data layer**: Supabase (Postgres + Auth + Storage), with Row Level
+  Security policies scoping candidates to their own data and staff-only
+  tables to `backoffice_users` members (`lib/supabase.ts`, `lib/jobs.ts`,
+  `lib/backoffice.ts`, `supabase/migrations/`).
+- **Document storage**: candidate documents are uploaded via
+  `supabase/functions/candidate-documents`, scanned fail-closed through
+  `DOCUMENT_SCANNER_URL` before being marked clean, and stored in
+  Cloudflare R2 (see `.env.example`).
 
 ## Prerequisites
 
 - Node.js `>=22.13.0`
 - Linux with `flock`, `curl`, and GNU `timeout`
+- A Supabase project (local via the Supabase CLI, or a hosted project) — see
+  `docs/database.md`.
 
-## Sites Lifecycle
+## Setup
+
+1. Copy `.env.example` to `.env` and fill in `NEXT_PUBLIC_SUPABASE_URL` /
+   `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` for your Supabase project.
+2. R2 credentials and `DOCUMENTS_ALLOWED_ORIGINS`/`DOCUMENT_SCANNER_URL` are
+   configured as **Supabase Edge Function secrets**
+   (`supabase secrets set ...`), not as `NEXT_PUBLIC_*` values — see
+   `docs/environment-checklist.md` for the full pre-launch list.
+3. `npm install`
+4. `npm run dev` to start the local dev server.
+
+## Scripts
+
+| Script | What it does |
+|---|---|
+| `npm run dev` | Start the local Vite/Vinext dev server. |
+| `npm run build` | Full verified build used by the platform's checkpoint/deploy path (`scripts/build-verified.sh`). |
+| `npm run build:vercel` | Plain `next build`, used by the `build` CI job and Vercel deployments. |
+| `npm run lint` | ESLint over the whole repo. |
+| `npm run typecheck` | `tsc --noEmit`. |
+| `npm run test:unit` | Business-logic tests (`tests/unit/`) and static RLS-policy coverage (`tests/security/`) — fast, no external services. |
+| `npm run test:build` | Legacy generic build/render checks (`tests/build/`); informational in CI, see `.github/workflows/ci.yml`. |
+| `npm run test` | Build, then run all of the above test suites. |
+| `npm run test:migrations` | Apply `supabase/migrations/` to a fresh local Supabase stack and run the pgTAP RLS suite (`supabase/tests/database/`); requires Docker and the Supabase CLI. See `docs/database.md`. |
+| `npm run test:e2e` | Playwright suite (`e2e/`) against a seeded staging/local instance; see `docs/deployment.md`. |
+
+## Further documentation
+
+- [`docs/database.md`](docs/database.md) — Supabase migration naming/review
+  process, seed-data strategy, and the CI migration-test job.
+- [`docs/deployment.md`](docs/deployment.md) — staging environment, the
+  feature-branch → staging → production deployment flow, and the rollback
+  process.
+- [`docs/environment-checklist.md`](docs/environment-checklist.md) —
+  mandatory pre-launch checklist for production environment variables,
+  redirects, email, and secrets.
+
+---
+
+## Platform internals (Sites/Vinext hosting)
+
+The sections below describe the underlying Vinext starter and the OpenAI
+Sites hosting platform this app is deployed on. They matter for how the
+scripts under `scripts/` work, but are not part of the MediBridge product
+itself.
+
+### Sites Lifecycle
 
 The Sites lifecycle CLI runs the locked dependency install before returning this checkout. Edit the source under `app/`, then checkpoint when a coherent milestone is ready to inspect or share. The remote Sites builder runs `npm run build` against the pushed commit. Do not repeat install or build as a normal pre-checkpoint step.
 
@@ -100,7 +165,8 @@ actions tied to the current ChatGPT user. Leave public content anonymous.
 - `npm run dev`: start the Vite/Vinext development server
 - `npm run build`: build the deployable Sites artifact
 - `npm run start`: start the built Vinext application
-- `npm test`: build and verify the rendered development-preview metadata
+- `npm test`: build and run the full test suite (see the Scripts table above
+  for the MediBridge-specific test suites this now includes)
 - `npm run db:generate`: generate Drizzle migrations after schema changes
 
 Use build commands for targeted diagnosis after a remote failure, not as part of the normal checkpoint path.
