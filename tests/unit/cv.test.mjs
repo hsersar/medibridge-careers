@@ -76,3 +76,13 @@ test("curriculumVitaeFileName builds a safe slug", async (t) => {
   );
   assert.match(curriculumVitaeFileName({}), /^lebenslauf-\d{4}-\d{2}-\d{2}\.html$/);
 });
+
+test("curriculumVitaeMissingFields identifies the minimum CV data", async (t) => {
+  const { curriculumVitaeMissingFields } = await loadCv(t);
+
+  assert.deepEqual(curriculumVitaeMissingFields({}), ["fullName", "birthDate", "targetRole"]);
+  assert.deepEqual(
+    curriculumVitaeMissingFields({ fullName: "Amira Ben Salah", birthDate: "1996-04-17", targetRole: "Pflegefachkraft" }),
+    [],
+  );
+});
