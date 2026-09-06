@@ -38,7 +38,7 @@ test("buildCurriculumVitaeSections keeps only answered fields", async (t) => {
 
 test("buildCurriculumVitaeHtml renders a German CV document", async (t) => {
   const { buildCurriculumVitaeHtml } = await loadCv(t);
-  const html = buildCurriculumVitaeHtml(answers, "de", new Date("2026-09-06T10:00:00Z"));
+  const html = buildCurriculumVitaeHtml(answers, "de", new Date(2026, 8, 6, 12, 0, 0));
 
   assert.match(html, /<html lang="de" dir="ltr">/);
   assert.match(html, /<title>Lebenslauf – Amira Ben Salah<\/title>/);

@@ -41,6 +41,7 @@ export function escapeHtml(value:string){
   return value.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;");
 }
 
+/** Formats an ISO `YYYY-MM-DD` value for the given language; other values are returned trimmed. */
 export function formatCvDate(value:string,language:CvLanguage){
   const match=/^(\d{4})-(\d{2})-(\d{2})$/.exec(value.trim());
   if(!match)return value.trim();
@@ -48,6 +49,13 @@ export function formatCvDate(value:string,language:CvLanguage){
   return language==="en"?`${day}/${month}/${year}`:`${day}.${month}.${year}`;
 }
 
+function localIsoDate(date:Date){
+  const month=`${date.getMonth()+1}`.padStart(2,"0");
+  const day=`${date.getDate()}`.padStart(2,"0");
+  return `${date.getFullYear()}-${month}-${day}`;
+}
+
+/** Builds the CV sections, skipping every question the candidate has not answered yet. */
 export function buildCurriculumVitaeSections(answers:CvAnswers,language:CvLanguage):CvSection[]{
   const labels=cvCopy[language];
   const sections:CvSection[]=[];
@@ -63,18 +71,20 @@ export function buildCurriculumVitaeSections(answers:CvAnswers,language:CvLangua
   return sections;
 }
 
+/** Derives a safe download file name from the candidate name, falling back to a generic name. */
 export function curriculumVitaeFileName(answers:CvAnswers){
-  const slug=(answers.fullName??"").normalize("NFKD").replace(/[^a-zA-Z0-9]+/g,"-").replace(/^-+|-+$/g,"").toLowerCase();
+  const slug=(answers.fullName??"").normalize("NFKD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-zA-Z0-9]+/g,"-").replace(/^-+|-+$/g,"").toLowerCase();
   return `lebenslauf-${slug||"medibridge"}.html`;
 }
 
+/** Renders a printable German-style CV document; all candidate values are HTML escaped. */
 export function buildCurriculumVitaeHtml(answers:CvAnswers,language:CvLanguage,generatedAt=new Date()){
   const labels=cvCopy[language];
   const rtl=language==="ar";
   const name=(answers.fullName??"").trim()||labels.document;
   const headline=(answers.targetRole??"").trim();
   const sections=buildCurriculumVitaeSections(answers,language);
-  const created=`${labels.generated} ${formatCvDate(generatedAt.toISOString().slice(0,10),language)}`;
+  const created=`${labels.generated} ${formatCvDate(localIsoDate(generatedAt),language)}`;
   const body=sections.map(section=>`      <section>
         <h2>${escapeHtml(section.title)}</h2>
         <dl>
