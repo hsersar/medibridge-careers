@@ -36,6 +36,21 @@ test("buildCurriculumVitaeSections keeps only answered fields", async (t) => {
   assert.ok(!sections.some((section) => section.rows.some((row) => row.value === "")));
 });
 
+test("mergeCvAnswers retains intake values when profile fields are empty", async (t) => {
+  const { mergeCvAnswers } = await loadCv(t);
+  const merged = mergeCvAnswers(
+    { fullName: "Amira Ben Salah", qualification: "Diplom Krankenpflege" },
+    { fullName: "", targetRole: "Pflegefachkraft", email: "amira@example.com" },
+  );
+
+  assert.deepEqual(merged, {
+    fullName: "Amira Ben Salah",
+    qualification: "Diplom Krankenpflege",
+    targetRole: "Pflegefachkraft",
+    email: "amira@example.com",
+  });
+});
+
 test("buildCurriculumVitaeHtml renders a German CV document", async (t) => {
   const { buildCurriculumVitaeHtml } = await loadCv(t);
   const html = buildCurriculumVitaeHtml(answers, "de", new Date(2026, 8, 6, 12, 0, 0));

@@ -42,6 +42,15 @@ const sectionFields:{key:CvSectionKey;fields:CvFieldKey[]}[]=[
   {key:"mobility",fields:["passport","visa","relocation"]}
 ];
 
+/** Applies profile values without discarding completed intake answers with empty profile fields. */
+export function mergeCvAnswers(answers:CvAnswers,profileValues:CvAnswers):CvAnswers{
+  const merged={...answers};
+  for(const [field,value] of Object.entries(profileValues)){
+    if(value?.trim())merged[field]=value;
+  }
+  return merged;
+}
+
 export function escapeHtml(value:string){
   return value.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;");
 }
