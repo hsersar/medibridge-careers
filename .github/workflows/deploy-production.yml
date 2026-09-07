@@ -53,6 +53,15 @@ jobs:
               --project-ref "$SUPABASE_PROJECT_REF"
           done
 
+      - name: Apply Cloudflare R2 CORS policy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: 3f8a3fe2b7030acfedb73ee30cd0ccd1
+        run: |
+          test -n "$CLOUDFLARE_API_TOKEN"
+          npx wrangler r2 bucket cors set medibridge-candidate-documents \
+            --file cloudflare/r2-cors-wrangler.json
+
       - name: Link Vercel project
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}

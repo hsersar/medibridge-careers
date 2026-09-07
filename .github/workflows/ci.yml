@@ -20,7 +20,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: npm install --no-audit --no-fund
+      - run: npm ci --no-audit --no-fund
       - run: npm run lint
 
   typecheck:
@@ -31,7 +31,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: npm install --no-audit --no-fund
+      - run: npm ci --no-audit --no-fund
       - run: npm run typecheck
 
   unit-tests:
@@ -43,7 +43,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: npm install --no-audit --no-fund
+      - run: npm ci --no-audit --no-fund
       # Business-logic (lib/jobs.ts, lib/backoffice.ts, lib/supabase.ts) and
       # static RLS-policy coverage tests. Fast, no external services needed.
       - run: npm run test:unit
@@ -56,7 +56,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: npm install --no-audit --no-fund
+      - run: npm ci --no-audit --no-fund
       - run: npm run build:vercel
       - run: npm run typecheck
       - run: npm test
@@ -75,7 +75,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: npm install --no-audit --no-fund
+      - run: npm ci --no-audit --no-fund
       - run: npm run build
       - run: npm run test:build
 
@@ -90,6 +90,19 @@ jobs:
           version: latest
       - run: npm run test:migrations
 
+  native-config:
+    name: Capacitor configuration
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci --no-audit --no-fund
+      - run: npm run native:sync
+      - run: git diff --exit-code -- android ios
+
   e2e:
     name: End-to-end tests (Playwright)
     runs-on: ubuntu-latest
@@ -101,7 +114,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: npm install --no-audit --no-fund
+      - run: npm ci --no-audit --no-fund
       - run: npx playwright install --with-deps chromium
       - run: npm run test:e2e
         env:

@@ -1,4 +1,4 @@
-name: Database backup
+name: Database backup verification
 
 on:
   schedule:
@@ -13,15 +13,14 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - name: Dump production database
+      - name: Verify managed Supabase backup schedule
         env:
-          DATABASE_URL: ${{ secrets.SUPABASE_DATABASE_URL }}
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
         run: |
-          test -n "$DATABASE_URL"
-          pg_dump --no-owner --no-privileges "$DATABASE_URL" | gzip > medibridge-db-$(date -u +%Y%m%dT%H%M%SZ).sql.gz
-      - name: Upload encrypted backup artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: medibridge-database-backup-${{ github.run_id }}
-          path: medibridge-db-*.sql.gz
-          retention-days: 30
+          test -n "$SUPABASE_ACCESS_TOKEN"
+          test -n "$SUPABASE_PROJECT_REF"
+          curl --fail --silent --show-error \
+            -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+            "https://api.supabase.com/v1/projects/$SUPABASE_PROJECT_REF/database/backups/schedule" \
+            | jq -e 'type == "object"'

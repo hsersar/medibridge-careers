@@ -11,7 +11,7 @@ import {
 } from "../_shared/r2.ts";
 
 const allowedTypes = new Set(["application/pdf", "image/jpeg", "image/png"]);
-const allowedDocumentTypes = new Set(["passport", "qualification", "language", "reference"]);
+const allowedDocumentTypes = new Set(["passport", "qualification", "language", "reference", "general"]);
 const maxSize = 10 * 1024 * 1024;
 const selection = "id,candidate_id,document_type,file_name,storage_path,storage_provider,storage_bucket,mime_type,file_size,verification_status,verification_note,created_at,updated_at";
 

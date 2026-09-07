@@ -41,6 +41,17 @@ alter table public.candidate_notifications enable row level security;
 alter table public.candidate_applications enable row level security;
 alter table public.candidate_interviews enable row level security;
 
+drop policy if exists "Candidates manage own saved jobs" on public.candidate_saved_jobs;
+drop policy if exists "Staff manage saved jobs" on public.candidate_saved_jobs;
+drop policy if exists "Staff read saved jobs" on public.candidate_saved_jobs;
+drop policy if exists "Candidates read own notifications" on public.candidate_notifications;
+drop policy if exists "Candidates update own notifications" on public.candidate_notifications;
+drop policy if exists "Staff manage notifications" on public.candidate_notifications;
+drop policy if exists "Candidates manage own applications" on public.candidate_applications;
+drop policy if exists "Staff manage applications" on public.candidate_applications;
+drop policy if exists "Candidates read own interviews" on public.candidate_interviews;
+drop policy if exists "Staff manage interviews" on public.candidate_interviews;
+
 create policy "Candidates manage own saved jobs" on public.candidate_saved_jobs for all using(auth.uid()=candidate_id) with check(auth.uid()=candidate_id);
 create policy "Staff manage saved jobs" on public.candidate_saved_jobs for all using(public.is_backoffice_user()) with check(public.is_backoffice_user());
 create policy "Candidates read own notifications" on public.candidate_notifications for select using(auth.uid()=candidate_id);

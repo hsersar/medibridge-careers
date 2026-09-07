@@ -2,6 +2,18 @@
 -- management, transactional status changes, audit logging, e-mail templates
 -- and a centralized communication trail.
 
+-- Functions below write audit events. Create the target relation first so a
+-- clean database can compile and execute those functions in migration order.
+create table if not exists public.audit_logs (
+  id uuid primary key default gen_random_uuid(),
+  actor_id uuid references auth.users(id),
+  action text not null,
+  entity_type text not null,
+  entity_id uuid,
+  metadata jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now()
+);
+
 -- 1. Staff can edit candidate master data (candidates + intake answers).
 create policy "Staff update intakes" on public.candidate_intakes for update using (public.is_backoffice_user()) with check (public.is_backoffice_user());
 
@@ -61,15 +73,6 @@ end;
 $$;
 
 -- 4. Audit log covering all administrative actions.
-create table if not exists public.audit_logs (
-  id uuid primary key default gen_random_uuid(),
-  actor_id uuid references auth.users(id),
-  action text not null,
-  entity_type text not null,
-  entity_id uuid,
-  metadata jsonb not null default '{}'::jsonb,
-  created_at timestamptz not null default now()
-);
 alter table public.audit_logs enable row level security;
 create policy "Staff insert audit logs" on public.audit_logs for insert with check (public.is_backoffice_user() and actor_id = auth.uid());
 create policy "Admins read audit logs" on public.audit_logs for select using (
@@ -78,10 +81,12 @@ create policy "Admins read audit logs" on public.audit_logs for select using (
 create index if not exists audit_logs_created_idx on public.audit_logs(created_at desc);
 
 -- 5. Transactional status change (status update + history row + audit log).
-create or replace function public.update_candidate_status(candidate_id uuid, new_status text, note text default null)
-returns void language plpgsql security definer set search_path = public as $$
+drop function if exists public.update_candidate_status(uuid,text,text);
+create function public.update_candidate_status(candidate_id uuid, new_status text, note text default null)
+returns uuid language plpgsql security definer set search_path = public as $$
 declare
   previous_status text;
+  notification_id uuid;
 begin
   if not public.is_backoffice_user() then
     raise exception 'NOT_STAFF';
@@ -95,6 +100,10 @@ begin
   values (candidate_id, auth.uid(), previous_status, new_status, nullif(note, ''));
   insert into public.audit_logs (actor_id, action, entity_type, entity_id, metadata)
   values (auth.uid(), 'candidate.status_changed', 'candidates', candidate_id, jsonb_build_object('previous_status', previous_status, 'new_status', new_status));
+  insert into public.candidate_notifications (candidate_id, title, message)
+  values (candidate_id, 'MediBridge – Statusaktualisierung', 'Dein Kandidatenstatus wurde auf ' || new_status || ' aktualisiert.')
+  returning id into notification_id;
+  return notification_id;
 end;
 $$;
 

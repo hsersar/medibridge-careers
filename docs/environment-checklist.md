@@ -27,6 +27,9 @@ project specifically (not staging).
       `NEXT_PUBLIC_*` Vercel environment variables — these are the storage
       backend credentials for `supabase/functions/candidate-documents`
       and must not be exposed to the browser bundle.
+- [ ] Cloudflare R2 CORS is applied from `cloudflare/r2-cors-wrangler.json`;
+      an `OPTIONS` request from the production origin returns the matching
+      `Access-Control-Allow-Origin` header.
 - [ ] `DOCUMENTS_ALLOWED_ORIGINS` (an Edge Function secret) is restricted to
       the actual production domain(s) only — no staging URLs, no
       `localhost`, no wildcard.
@@ -40,6 +43,11 @@ project specifically (not staging).
       with no pending migrations) — see `docs/database.md`.
 - [ ] Production Vercel project's environment variables do not leak any
       staging-only values (staging Supabase URL/key, test E2E credentials).
+- [ ] Native Firebase configuration and `FIREBASE_SERVICE_ACCOUNT_JSON` are
+      installed in the protected release environments; push is verified on
+      physical iOS and Android devices as described in `docs/native-release.md`.
+- [ ] Supabase managed backups/PITR are enabled, the scheduled verification
+      workflow succeeds, and a restore drill has been documented.
 
 Once every box is checked, proceed with the production promotion/DNS cutover
 described in `docs/deployment.md`.

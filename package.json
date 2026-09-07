@@ -18,10 +18,17 @@
     "test:migrations": "bash scripts/test-migrations.sh",
     "typecheck": "tsc --noEmit",
     "lint": "bash scripts/sites-env.sh -- eslint . --ignore-pattern dist --ignore-pattern .next",
+    "native:sync": "cap sync",
+    "native:android": "cap open android",
+    "native:ios": "cap open ios",
     "db:generate": "bash scripts/sites-env.sh -- drizzle-kit generate"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",
+    "@capacitor-firebase/messaging": "^8.5.1",
+    "@capacitor/android": "^8.5.1",
+    "@capacitor/core": "^8.5.1",
+    "@capacitor/ios": "^8.5.1",
     "@hookform/resolvers": "^5.7.1",
     "@shadcn/react": "^0.3.0",
     "@supabase/supabase-js": "^2.112.4",
@@ -31,6 +38,7 @@
     "date-fns": "^4.4.0",
     "drizzle-orm": "0.45.2",
     "embla-carousel-react": "^8.6.0",
+    "firebase": "^12.18.0",
     "input-otp": "^1.4.2",
     "lucide-react": "^1.31.0",
     "next": "16.2.6",
@@ -48,6 +56,7 @@
     "zod": "^3.25.76"
   },
   "devDependencies": {
+    "@capacitor/cli": "^8.5.1",
     "@cloudflare/vite-plugin": "1.37.1",
     "@playwright/test": "^1.63.0",
     "@tailwindcss/postcss": "4.2.1",

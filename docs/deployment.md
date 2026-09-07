@@ -70,6 +70,7 @@ running it:
 - `VERCEL_TOKEN`
 - `VERCEL_ORG_ID`
 - `VERCEL_PROJECT_ID`
+- `CLOUDFLARE_API_TOKEN`
 
 The production Vercel environment variables and Supabase Edge Function
 secrets listed in `docs/environment-checklist.md` remain separate from these

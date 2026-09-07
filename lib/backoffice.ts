@@ -66,6 +66,10 @@ export async function updateCandidateStatus(candidateId:string,previousStatus:Ca
   const user=(await supabase.auth.getUser()).data.user;if(!user)throw new Error("UNAUTHENTICATED");
   const result=await supabase.rpc("update_candidate_status",{candidate_id:candidateId,new_status:newStatus,note:note||null});
   if(result.error)throw result.error;
+  if(typeof result.data==="string"){
+    const pushed=await supabase.functions.invoke("send-push-notification",{body:{notificationId:result.data}});
+    if(pushed.error)console.error("Push delivery failed",pushed.error);
+  }
 }
 
 export async function listCandidateInterests(candidateId:string){const result=await supabase.from("candidate_job_interests").select("id,job_id,candidate_id,status,created_at").eq("candidate_id",candidateId).order("created_at",{ascending:false});if(result.error)throw result.error;return(result.data??[]) as BackofficeInterest[]}

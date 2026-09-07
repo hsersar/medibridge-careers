@@ -1,0 +1,16 @@
+{
+  "rules": [
+    {
+      "allowed": {
+        "origins": [
+          "https://medibridge-careers.vercel.app",
+          "https://medibridge-careers.hi-sersar.chatgpt.site"
+        ],
+        "methods": ["GET", "PUT", "HEAD"],
+        "headers": ["Content-Type"]
+      },
+      "exposeHeaders": ["ETag"],
+      "maxAgeSeconds": 3600
+    }
+  ]
+}

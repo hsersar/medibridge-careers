@@ -58,7 +58,7 @@ test("every public table with Row Level Security has at least one policy", async
   );
   const tablesWithPolicies = findTables(
     sql,
-    /create policy "[^"]+" on public\.(\w+)/gi,
+    /create policy "[^"]+"\s+on public\.(\w+)/gi,
   );
 
   const missing = [...rlsEnabledTables].filter((table) => !tablesWithPolicies.has(table));

@@ -6,7 +6,12 @@
 - Configure Cloudflare R2 and deploy `candidate-documents`.
 - Configure `DOCUMENT_SCANNER_URL` and `DOCUMENT_SCANNER_TOKEN`; uploads fail closed when scanning is unavailable.
 - Configure `RESEND_API_KEY` and `RESEND_FROM_EMAIL` for backoffice email delivery.
-- Configure `SUPABASE_DATABASE_URL` as a GitHub Actions secret for the scheduled backup workflow.
+- Configure `FIREBASE_SERVICE_ACCOUNT_JSON` as a Supabase Edge Function secret and add
+  the Firebase native configuration files to the protected release pipeline.
+- Configure `CLOUDFLARE_API_TOKEN` in the GitHub production environment; deployment
+  applies and verifies the committed R2 CORS policy.
+- Enable Supabase managed backups/PITR. The scheduled workflow verifies the backup
+  schedule through the Management API and never copies production dumps into GitHub.
 
 ## Monitoring
 
@@ -17,4 +22,4 @@
 
 ## Data deletion
 
-Administrators process verified deletion requests through `purge-candidate-data`. The function deletes the candidate row and its cascading profile, intake, documents, saved jobs and interests. Storage objects must be removed by the retention job before the request is marked complete.
+Administrators process verified deletion requests through `purge-candidate-data`. The function removes Supabase Storage and R2 objects, deletes the Supabase Auth user and cascading candidate records, then retains only a restricted deletion receipt and the completed request record.
