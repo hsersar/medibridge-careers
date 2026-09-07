@@ -68,6 +68,36 @@ test("listMyInterests returns an empty list for anonymous visitors", async (t) =
   assert.deepEqual(await listMyInterests(), []);
 });
 
+test("listMyInterests rejects a Supabase anonymous session", async (t) => {
+  const ctx = await createTestContext();
+  t.after(() => ctx.close());
+
+  let queried = false;
+  ctx.mockSupabase({
+    auth: { getUser: async () => ({ data: { user: { id: "anon-1", is_anonymous: true } } }) },
+    from: () => { queried = true; throw new Error("must not query"); },
+  });
+
+  const { listMyInterests } = await ctx.load("/lib/jobs.ts");
+  assert.deepEqual(await listMyInterests(), []);
+  assert.equal(queried, false);
+});
+
+test("candidate mutations reject a Supabase anonymous session", async (t) => {
+  const ctx = await createTestContext();
+  t.after(() => ctx.close());
+
+  ctx.mockSupabase({
+    auth: { getUser: async () => ({ data: { user: { id: "anon-1", is_anonymous: true } } }) },
+  });
+
+  const { applyForJob, createPrivacyRequest, expressJobInterest, toggleSavedJob } = await ctx.load("/lib/jobs.ts");
+  await assert.rejects(() => applyForJob("job-1"), /PROFILE_REQUIRED/);
+  await assert.rejects(() => createPrivacyRequest("deletion"), /PROFILE_REQUIRED/);
+  await assert.rejects(() => expressJobInterest("job-1"), /PROFILE_REQUIRED/);
+  await assert.rejects(() => toggleSavedJob("job-1", false), /PROFILE_REQUIRED/);
+});
+
 test("listMyInterests scopes the query to the authenticated candidate", async (t) => {
   const ctx = await createTestContext();
   t.after(() => ctx.close());

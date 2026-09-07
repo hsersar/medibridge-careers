@@ -46,7 +46,7 @@ const authenticated = withSupabase({ auth: "user" }, async (request, ctx) => {
     if (request.method !== "POST") return json(request, { error: "METHOD_NOT_ALLOWED" }, 405);
     const client = ctx.supabase;
     const userId = ctx.userClaims?.sub ?? ctx.userClaims?.id;
-    if (!userId) return json(request, { error: "AUTH_REQUIRED" }, 401);
+    if (!userId || ctx.userClaims?.is_anonymous === true) return json(request, { error: "AUTH_REQUIRED" }, 401);
 
     const payload = await request.json();
     const action = String(payload.action ?? "");
