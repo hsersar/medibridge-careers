@@ -42,6 +42,14 @@ test("production deployment applies the committed R2 CORS policy", async () => {
   assert.match(workflow, /cloudflare\/r2-cors-wrangler\.json/);
 });
 
+test("production deployment safely builds the Supabase pooler URL from a password secret", async () => {
+  const workflow = await source(".github/workflows/deploy-production.yml");
+  assert.match(workflow, /secrets\.SUPABASE_DB_PASSWORD/);
+  assert.match(workflow, /encodeURIComponent\(process\.env\.SUPABASE_DB_PASSWORD\)/);
+  assert.match(workflow, /aws-1-eu-west-1\.pooler\.supabase\.com:5432\/postgres\?sslmode=require/);
+  assert.doesNotMatch(workflow, /secrets\.SUPABASE_DATABASE_URL/);
+});
+
 test("application sends the required production security headers", async () => {
   const config = await source("next.config.ts");
   for (const header of [
