@@ -50,4 +50,6 @@ const handler = withSupabase({ auth: "user" }, async (request, ctx) => {
   return Response.json({ processed: outcomes.filter(item=>item.status==="completed").length, outcomes });
 });
 
-export default { fetch: handler };
+const purgeWorker = { fetch: handler };
+
+export default purgeWorker;

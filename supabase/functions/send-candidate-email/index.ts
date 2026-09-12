@@ -57,7 +57,7 @@ const authenticated = withSupabase({ auth: "user" }, async (request, ctx) => {
   }
 });
 
-export default {
+const emailWorker = {
   fetch(request: Request) {
     if (request.method === "OPTIONS") {
       return new Response(null, { status: 204, headers: corsHeaders(request) });
@@ -65,3 +65,5 @@ export default {
     return authenticated(request);
   },
 };
+
+export default emailWorker;
