@@ -39,6 +39,38 @@ jobs:
         run: |
           test -n "$SUPABASE_DB_PASSWORD"
           SUPABASE_DATABASE_URL="$(node -e 'const password = encodeURIComponent(process.env.SUPABASE_DB_PASSWORD); process.stdout.write(`postgresql://postgres.idzahhvslobjywqyklml:${password}@aws-1-eu-west-1.pooler.supabase.com:5432/postgres?sslmode=require`)')"
+          baseline_versions=(
+            20260831220000
+            20260901080000
+            20260901093000
+            20260901110000
+            20260901130000
+            20260901143000
+            20260901223000
+            20260905190000
+            20260906120000
+            20260906140000
+            20260907090000
+            20260907100000
+            20260907123000
+            20260907150000
+            20260912100000
+          )
+          migration_list="$(supabase migration list --db-url "$SUPABASE_DATABASE_URL")"
+          applied_baseline=0
+          for version in "${baseline_versions[@]}"; do
+            if grep -Eq "$version.*$version" <<< "$migration_list"; then
+              applied_baseline=$((applied_baseline + 1))
+            fi
+          done
+          if [ "$applied_baseline" -eq 0 ]; then
+            supabase migration repair "${baseline_versions[@]}" \
+              --status applied \
+              --db-url "$SUPABASE_DATABASE_URL"
+          elif [ "$applied_baseline" -ne "${#baseline_versions[@]}" ]; then
+            echo "::error::Remote migration history is only partially initialized ($applied_baseline/${#baseline_versions[@]} baseline migrations)."
+            exit 1
+          fi
           supabase db push --db-url "$SUPABASE_DATABASE_URL"
           unset SUPABASE_DATABASE_URL
 

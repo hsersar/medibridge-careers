@@ -50,6 +50,15 @@ test("production deployment safely builds the Supabase pooler URL from a passwor
   assert.doesNotMatch(workflow, /secrets\.SUPABASE_DATABASE_URL/);
 });
 
+test("production deployment safely baselines manually applied Supabase migrations", async () => {
+  const workflow = await source(".github/workflows/deploy-production.yml");
+  assert.match(workflow, /supabase migration list --db-url/);
+  assert.match(workflow, /if \[ "\$applied_baseline" -eq 0 \]/);
+  assert.match(workflow, /supabase migration repair "\$\{baseline_versions\[@\]\}"/);
+  assert.match(workflow, /--status applied/);
+  assert.match(workflow, /elif \[ "\$applied_baseline" -ne "\$\{#baseline_versions\[@\]\}" \]/);
+});
+
 test("application sends the required production security headers", async () => {
   const config = await source("next.config.ts");
   for (const header of [
