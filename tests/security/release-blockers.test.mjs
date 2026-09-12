@@ -41,3 +41,33 @@ test("production deployment applies the committed R2 CORS policy", async () => {
   assert.match(workflow, /wrangler r2 bucket cors set medibridge-candidate-documents/);
   assert.match(workflow, /cloudflare\/r2-cors-wrangler\.json/);
 });
+
+test("application sends the required production security headers", async () => {
+  const config = await source("next.config.ts");
+  for (const header of [
+    "Content-Security-Policy",
+    "Referrer-Policy",
+    "X-Content-Type-Options",
+    "X-Frame-Options",
+    "Permissions-Policy",
+    "Cross-Origin-Opener-Policy",
+    "Strict-Transport-Security",
+  ]) {
+    assert.match(config, new RegExp(header));
+  }
+  assert.match(config, /frame-ancestors 'none'/);
+  assert.match(config, /object-src 'none'/);
+  assert.match(config, /poweredByHeader:\s*false/);
+});
+
+test("candidate saved jobs always expose the id selected by the application", async () => {
+  const migration = await source("supabase/migrations/20260912100000_sprint_6_release_hardening.sql");
+  assert.match(migration, /candidate_saved_jobs[\s\S]+add column if not exists id uuid/);
+  assert.match(migration, /alter column id set not null/);
+  assert.match(migration, /candidate_saved_jobs_id_key/);
+});
+
+test("scheduled backup verification uses production environment secrets", async () => {
+  const workflow = await source(".github/workflows/backup.yml");
+  assert.match(workflow, /environment: production/);
+});

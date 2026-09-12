@@ -1,5 +1,5 @@
 "use client";
-import {useEffect,useMemo,useState} from "react";
+import {useCallback,useEffect,useMemo,useState} from "react";
 import Link from "next/link";
 import {ArrowLeft,CheckCircle2,ChevronRight,ClipboardList,FileText,Filter,LogOut,Mail,MessageSquarePlus,Pencil,Plus,Save,Search,ShieldCheck,Trash2,UserRound,XCircle,type LucideIcon} from "lucide-react";
 import {addInternalNote,countCandidatesByStatus,createCandidateInterest,EmailDeliveryError,getBackofficeSession,getCandidateActivity,listBackofficeCandidates,listCandidateInterests,listEmailTemplates,prepareCandidateEmail,removeCandidateInterest,reviewCandidateDocument,saveEmailTemplate,signInBackoffice,signOutBackoffice,updateCandidateInterest,updateCandidateProfile,updateCandidateStatus,type BackofficeCandidate,type BackofficeInterest,type BackofficeMembership,type EmailLog,type EmailTemplate,type InternalNote,type StatusHistoryEntry} from "@/lib/backoffice";
@@ -24,13 +24,13 @@ export default function BackofficePage(){
   const [loading,setLoading]=useState(false);
   const [error,setError]=useState("");
 
-  const load=async(nextPage=page,nextFilter=filter,nextQuery=query)=>{
+  const load=useCallback(async(nextPage:number,nextFilter:string,nextQuery:string)=>{
     setLoading(true);
     try{
       const result=await listBackofficeCandidates({page:nextPage,pageSize:PAGE_SIZE,status:nextFilter,query:nextQuery});
       setCandidates(result.rows);
       setTotal(result.total);
-      if(!selectedId&&result.rows[0])setSelectedId(result.rows[0].id);
+      setSelectedId(current=>current||result.rows[0]?.id||"");
       const [reviewCount,verifiedCount]=await Promise.all([
         countCandidatesByStatus("under_review"),
         countCandidatesByStatus("verified"),
@@ -41,19 +41,19 @@ export default function BackofficePage(){
     }finally{
       setLoading(false);
     }
-  };
+  },[]);
 
-  useEffect(()=>{getBackofficeSession().then(value=>{setSession(value);if(value)void load(1,filter,query)})},[]);
-  useEffect(()=>{if(!session)return;const handle=setTimeout(()=>{setPage(1);void load(1,filter,query)},350);return()=>clearTimeout(handle)},[query]);
+  useEffect(()=>{getBackofficeSession().then(setSession)},[]);
+  useEffect(()=>{if(!session)return;const handle=setTimeout(()=>{setPage(1);void load(1,filter,query)},350);return()=>clearTimeout(handle)},[filter,load,query,session]);
 
-  const changeFilter=(value:string)=>{setFilter(value);setPage(1);void load(1,value,query)};
+  const changeFilter=(value:string)=>{setFilter(value);setPage(1)};
   const changePage=(next:number)=>{setPage(next);void load(next,filter,query)};
 
   const selected=candidates.find(x=>x.id===selectedId)||null;
   const pages=Math.max(1,Math.ceil(total/PAGE_SIZE));
 
   if(session===undefined)return <main className="bo-login"><img src="/medibridge-logo.svg" alt="MediBridge"/><p>Backoffice wird geladen …</p></main>;
-  if(!session)return <Login onSuccess={value=>{setSession(value);void load(1)}}/>;
+  if(!session)return <Login onSuccess={value=>{setSession(value);void load(1,"all","")}}/>;
 
   return <main className="bo-shell">
     <aside className={`bo-sidebar ${selected?"has-selection":""}`}>
@@ -194,7 +194,7 @@ function EmailTab({candidate,emails,onPrepared}:{candidate:BackofficeCandidate;e
   const [editingTemplate,setEditingTemplate]=useState(false);
   const [sendError,setSendError]=useState("");
 
-  useEffect(()=>{listEmailTemplates().then(rows=>{setTemplates(rows);const first=rows[0];if(first){setTemplate(first.id);setSubject(first.subject);setBody(first.body.replace("{{name}}",candidate.full_name||""))}}).catch(()=>undefined)},[]);
+  useEffect(()=>{listEmailTemplates().then(rows=>{setTemplates(rows);const first=rows[0];if(first){setTemplate(first.id);setSubject(first.subject);setBody(first.body.replace("{{name}}",candidate.full_name||""))}}).catch(()=>undefined)},[candidate.full_name]);
 
   const choose=(id:string)=>{const item=templates.find(x=>x.id===id);if(!item)return;setTemplate(id);setSubject(item.subject);setBody(item.body.replace("{{name}}",candidate.full_name||""))};
 

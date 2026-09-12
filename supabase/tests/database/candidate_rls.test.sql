@@ -6,7 +6,14 @@
 --   supabase test db
 -- CI runs the same suite via `npm run test:migrations` (scripts/test-migrations.sh).
 begin;
-select plan(6);
+select plan(7);
+
+select has_column(
+  'public',
+  'candidate_saved_jobs',
+  'id',
+  'Saved jobs expose the stable identifier required by the application API'
+);
 
 -- Two candidates with minimal profiles.
 insert into auth.users (id, email) values

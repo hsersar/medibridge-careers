@@ -44,6 +44,8 @@ jobs:
         with:
           node-version: 22
       - run: npm ci --no-audit --no-fund
+      - name: Reject high and critical production dependency vulnerabilities
+        run: npm audit --omit=dev --audit-level=high
       # Business-logic (lib/jobs.ts, lib/backoffice.ts, lib/supabase.ts) and
       # static RLS-policy coverage tests. Fast, no external services needed.
       - run: npm run test:unit
