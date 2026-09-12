@@ -96,7 +96,7 @@ jobs:
           npx wrangler r2 bucket cors set medibridge-candidate-documents \
             --file cloudflare/r2-cors-wrangler.json
 
-      - name: Link Vercel project
+      - name: Verify Vercel Git production deployment
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
@@ -105,13 +105,27 @@ jobs:
           test -n "$VERCEL_ORG_ID"
           test -n "$VERCEL_PROJECT_ID"
           test -n "$VERCEL_TOKEN"
-          npx --yes vercel@55.0.0 link \
-            --yes \
-            --scope "$VERCEL_ORG_ID" \
-            --project "$VERCEL_PROJECT_ID" \
-            --token "$VERCEL_TOKEN"
-
-      - name: Deploy Vercel production
-        env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-        run: npx --yes vercel@55.0.0 deploy --prod --yes --token "$VERCEL_TOKEN"
+          for attempt in $(seq 1 30); do
+            deployments="$(curl --fail --silent --show-error \
+              --header "Authorization: Bearer $VERCEL_TOKEN" \
+              "https://api.vercel.com/v6/deployments?projectId=$VERCEL_PROJECT_ID&teamId=$VERCEL_ORG_ID&target=production&limit=20")"
+            deployment_status="$(DEPLOYMENTS_JSON="$deployments" node -e '
+              const payload = JSON.parse(process.env.DEPLOYMENTS_JSON);
+              const deployment = payload.deployments?.find(
+                (item) => item.meta?.githubCommitSha === process.env.GITHUB_SHA,
+              );
+              process.stdout.write(deployment?.state ?? "PENDING");
+            ')"
+            if [ "$deployment_status" = "READY" ]; then
+              echo "Vercel production deployment for $GITHUB_SHA is ready."
+              exit 0
+            fi
+            if [ "$deployment_status" = "ERROR" ] || [ "$deployment_status" = "CANCELED" ]; then
+              echo "::error::Vercel production deployment finished with $deployment_status."
+              exit 1
+            fi
+            echo "Waiting for Vercel production deployment ($attempt/30): $deployment_status"
+            sleep 10
+          done
+          echo "::error::Timed out waiting for the Vercel production deployment."
+          exit 1
