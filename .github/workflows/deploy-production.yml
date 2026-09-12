@@ -35,10 +35,12 @@ jobs:
 
       - name: Apply production migrations
         env:
-          SUPABASE_DATABASE_URL: ${{ secrets.SUPABASE_DATABASE_URL }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
         run: |
-          test -n "$SUPABASE_DATABASE_URL"
+          test -n "$SUPABASE_DB_PASSWORD"
+          SUPABASE_DATABASE_URL="$(node -e 'const password = encodeURIComponent(process.env.SUPABASE_DB_PASSWORD); process.stdout.write(`postgresql://postgres.idzahhvslobjywqyklml:${password}@aws-1-eu-west-1.pooler.supabase.com:5432/postgres?sslmode=require`)')"
           supabase db push --db-url "$SUPABASE_DATABASE_URL"
+          unset SUPABASE_DATABASE_URL
 
       - name: Deploy Supabase Edge Functions
         env:
