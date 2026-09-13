@@ -37,7 +37,7 @@ export async function signInCandidate(page: Page) {
   await expect(loginLink).toBeVisible();
   await loginLink.click();
   await page.getByLabel(/البريد الإلكتروني/).fill(environment.E2E_CANDIDATE_EMAIL);
-  await page.getByLabel(/كلمة المرور/).fill(environment.E2E_CANDIDATE_PASSWORD);
+  await page.locator('input[autocomplete="current-password"]').fill(environment.E2E_CANDIDATE_PASSWORD);
   await page.getByRole("button", { name: /تسجيل الدخول/ }).click();
   await expect(page.locator(".app-shell")).toBeVisible({ timeout: 20_000 });
 }
