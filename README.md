@@ -64,6 +64,8 @@ postings.
 - [`docs/environment-checklist.md`](docs/environment-checklist.md) —
   mandatory pre-launch checklist for production environment variables,
   redirects, email, and secrets.
+- [`docs/sprint-7-acceptance.md`](docs/sprint-7-acceptance.md) — isolated
+  staging configuration, mandatory end-to-end gate and release evidence.
 
 ---
 

@@ -29,16 +29,32 @@ function safeName(name: string) {
 async function scanObject(key: string, mimeType: string) {
   const scanner = Deno.env.get("DOCUMENT_SCANNER_URL");
   const token = Deno.env.get("DOCUMENT_SCANNER_TOKEN");
+  const provider = (Deno.env.get("DOCUMENT_SCANNER_PROVIDER") ??
+    (scanner?.includes("cloudmersive.com") ? "cloudmersive" : "generic")).toLowerCase();
   if (!scanner || !token) throw new Error("DOCUMENT_SCANNER_NOT_CONFIGURED");
+  const object = await downloadObject(key);
+  let body: BodyInit;
+  let headers: Record<string, string>;
+  if (provider === "cloudmersive") {
+    const form = new FormData();
+    form.append("inputFile", new Blob([object], { type: mimeType }), key.split("/").at(-1) ?? "document");
+    body = form;
+    headers = { Apikey: token };
+  } else {
+    body = object;
+    headers = { Authorization: "Bearer " + token, "Content-Type": mimeType };
+  }
   const response = await fetch(scanner, {
     method: "POST",
-    headers: { Authorization: "Bearer " + token, "Content-Type": mimeType },
-    body: await downloadObject(key),
+    headers,
+    body,
+    signal: AbortSignal.timeout(30_000),
   });
   if (!response.ok) throw new Error("DOCUMENT_SCANNER_FAILED");
   const result = await response.json().catch(() => ({}));
-  if (result.clean !== true) throw new Error("MALWARE_DETECTED");
-  return String(result.provider ?? "external-scanner");
+  const clean = provider === "cloudmersive" ? result.CleanResult === true : result.clean === true;
+  if (!clean) throw new Error("MALWARE_DETECTED");
+  return String(result.provider ?? provider);
 }
 
 const authenticated = withSupabase({ auth: "user" }, async (request, ctx) => {

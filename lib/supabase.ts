@@ -1,7 +1,10 @@
 import { createClient } from "@supabase/supabase-js";
 
-const supabaseUrl=process.env.NEXT_PUBLIC_SUPABASE_URL??"https://idzahhvslobjywqyklml.supabase.co";
-const supabaseKey=process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY??"sb_publishable_b5Sy7_MiCapOrVFS5JysAw_PNiISL6L";
+// A missing environment must never make a preview or staging build talk to
+// production. The local fallback is intentionally non-production and only
+// supports builds/tests; real deployments configure both NEXT_PUBLIC values.
+const supabaseUrl=process.env.NEXT_PUBLIC_SUPABASE_URL??"http://127.0.0.1:54321";
+const supabaseKey=process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY??"sb_publishable_local_development_only";
 export type Language="en"|"de"|"ar"; export type CandidateStatus="draft"|"submitted"|"under_review"|"verified"|"rejected";
 export type CandidateDocument={id:string;document_type:string;file_name:string;storage_path:string;storage_provider:"supabase"|"r2";storage_bucket:string;mime_type:string|null;file_size:number|null;verification_status:"pending"|"verified"|"rejected";verification_note:string|null;created_at:string;updated_at:string};
 export type JobPreferences={desired_role:string;preferred_region:string;possible_start:string;workplace:string};
