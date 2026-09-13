@@ -47,7 +47,8 @@ export default async function globalSetup() {
     "candidate_intakes",
     "candidates",
   ]) {
-    const result = await client.from(table).delete().eq("candidate_id", candidate.id);
+    const filterColumn = table === "candidates" ? "id" : "candidate_id";
+    const result = await client.from(table).delete().eq(filterColumn, candidate.id);
     if (result.error) throw new Error(`${table}: ${result.error.message}`);
   }
 
