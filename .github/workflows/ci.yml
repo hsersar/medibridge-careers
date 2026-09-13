@@ -108,22 +108,74 @@ jobs:
   e2e:
     name: End-to-end tests (Playwright)
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 35
     needs: build
-    if: ${{ vars.E2E_ENABLED == 'true' }}
+    environment: staging
+    concurrency:
+      group: medibridge-staging
+      cancel-in-progress: false
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
       - run: npm ci --no-audit --no-fund
-      - run: npx playwright install --with-deps chromium
-      - run: npm run test:e2e
+      - name: Require the Sprint 7 staging gate
+        run: test "${{ vars.E2E_ENABLED }}" = "true"
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - name: Apply migrations to isolated staging
         env:
-          PLAYWRIGHT_BASE_URL: ${{ vars.STAGING_URL }}
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.STAGING_SUPABASE_DB_PASSWORD }}
+          SUPABASE_PROJECT_REF: ${{ vars.STAGING_SUPABASE_PROJECT_REF }}
+        run: |
+          test -n "$SUPABASE_ACCESS_TOKEN"
+          test -n "$SUPABASE_DB_PASSWORD"
+          test -n "$SUPABASE_PROJECT_REF"
+          test "$SUPABASE_PROJECT_REF" != "idzahhvslobjywqyklml"
+          supabase link --project-ref "$SUPABASE_PROJECT_REF" --password "$SUPABASE_DB_PASSWORD"
+          supabase db push --password "$SUPABASE_DB_PASSWORD"
+      - name: Deploy all five Edge Functions to staging
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_REF: ${{ vars.STAGING_SUPABASE_PROJECT_REF }}
+        run: |
+          functions=(candidate-documents migrate-candidate-documents purge-candidate-data send-candidate-email send-push-notification)
+          test "${#functions[@]}" -eq 5
+          for function in "${functions[@]}"; do
+            supabase functions deploy "$function" --project-ref "$SUPABASE_PROJECT_REF"
+          done
+      - run: npx playwright install --with-deps chromium
+      - name: Build current commit against staging
+        run: |
+          test -n "$NEXT_PUBLIC_SUPABASE_URL"
+          test -n "$NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY"
+          test "$NEXT_PUBLIC_SUPABASE_URL" != "https://idzahhvslobjywqyklml.supabase.co"
+          npm run build:vercel
+        env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ vars.STAGING_SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ vars.STAGING_SUPABASE_PUBLISHABLE_KEY }}
+      - run: npm run test:e2e
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ vars.STAGING_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ vars.STAGING_SUPABASE_PUBLISHABLE_KEY }}
+          E2E_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.E2E_SUPABASE_SERVICE_ROLE_KEY }}
           E2E_CANDIDATE_EMAIL: ${{ secrets.E2E_CANDIDATE_EMAIL }}
           E2E_CANDIDATE_PASSWORD: ${{ secrets.E2E_CANDIDATE_PASSWORD }}
           E2E_STAFF_EMAIL: ${{ secrets.E2E_STAFF_EMAIL }}
           E2E_STAFF_PASSWORD: ${{ secrets.E2E_STAFF_PASSWORD }}
+          E2E_DELIVERY_EMAIL: ${{ secrets.E2E_DELIVERY_EMAIL }}
+          E2E_REGISTRATION_EMAIL: ${{ secrets.E2E_REGISTRATION_EMAIL }}
+          E2E_RESEND_API_KEY: ${{ secrets.E2E_RESEND_API_KEY }}
+      - name: Upload Playwright evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sprint-7-playwright-report
+          path: |
+            playwright-report
+            test-results
+          if-no-files-found: ignore
+          retention-days: 14

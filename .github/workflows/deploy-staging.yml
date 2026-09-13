@@ -1,0 +1,85 @@
+name: Deploy staging
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: medibridge-staging
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy isolated staging environment
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: staging
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - name: Build staging application
+        run: |
+          test -n "$NEXT_PUBLIC_SUPABASE_URL"
+          test -n "$NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY"
+          test "$NEXT_PUBLIC_SUPABASE_URL" != "https://idzahhvslobjywqyklml.supabase.co"
+          npm run build:vercel
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ vars.STAGING_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ vars.STAGING_SUPABASE_PUBLISHABLE_KEY }}
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - name: Apply staging migrations
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.STAGING_SUPABASE_DB_PASSWORD }}
+          SUPABASE_PROJECT_REF: ${{ vars.STAGING_SUPABASE_PROJECT_REF }}
+        run: |
+          test -n "$SUPABASE_PROJECT_REF"
+          test "$SUPABASE_PROJECT_REF" != "idzahhvslobjywqyklml"
+          supabase link --project-ref "$SUPABASE_PROJECT_REF" --password "$SUPABASE_DB_PASSWORD"
+          supabase db push --password "$SUPABASE_DB_PASSWORD"
+      - name: Deploy all five staging Edge Functions
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_REF: ${{ vars.STAGING_SUPABASE_PROJECT_REF }}
+        run: |
+          functions=(candidate-documents migrate-candidate-documents purge-candidate-data send-candidate-email send-push-notification)
+          for function in "${functions[@]}"; do
+            supabase functions deploy "$function" --project-ref "$SUPABASE_PROJECT_REF"
+          done
+      - name: Apply staging R2 CORS
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          test -n "$CLOUDFLARE_API_TOKEN"
+          npx wrangler r2 bucket cors set medibridge-candidate-documents-staging \
+            --file cloudflare/r2-cors-staging.json
+      - name: Verify Vercel Git staging deployment
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          for attempt in $(seq 1 30); do
+            deployments="$(curl --fail --silent --show-error \
+              --header "Authorization: Bearer $VERCEL_TOKEN" \
+              "https://api.vercel.com/v6/deployments?projectId=$VERCEL_PROJECT_ID&teamId=$VERCEL_ORG_ID&target=production&limit=20")"
+            deployment_status="$(DEPLOYMENTS_JSON="$deployments" node -e '
+              const payload = JSON.parse(process.env.DEPLOYMENTS_JSON);
+              const deployment = payload.deployments?.find((item) => item.meta?.githubCommitSha === process.env.GITHUB_SHA);
+              process.stdout.write(deployment?.state ?? "PENDING");
+            ')"
+            [ "$deployment_status" = READY ] && exit 0
+            [ "$deployment_status" = ERROR ] && exit 1
+            sleep 10
+          done
+          exit 1

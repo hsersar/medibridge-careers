@@ -2,7 +2,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { withSupabase } from "jsr:@supabase/server@^1";
 import { corsHeaders } from "../_shared/cors.ts";
 
-const selection = "id,candidate_id,recipient,subject,body,status,created_at,sent_at";
+const selection = "id,candidate_id,recipient,subject,body,status,created_at,sent_at,provider_message_id,delivery_status";
 
 function json(request: Request, body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -13,8 +13,9 @@ function json(request: Request, body: unknown, status = 200) {
 
 async function deliver(recipient: string, subject: string, body: string) {
   const apiKey = Deno.env.get("RESEND_API_KEY");
-  const from = Deno.env.get("EMAIL_FROM_ADDRESS") ?? "MediBridge Maghreb <no-reply@medibridge-careers.example>";
+  const from = Deno.env.get("RESEND_FROM_EMAIL") ?? Deno.env.get("EMAIL_FROM_ADDRESS");
   if (!apiKey) throw new Error("EMAIL_PROVIDER_NOT_CONFIGURED");
+  if (!from) throw new Error("EMAIL_FROM_ADDRESS_NOT_CONFIGURED");
   const authHeader = "Bearer " + apiKey;
   const response = await fetch("https://api.resend.com/emails", {
     method: "POST",
@@ -22,6 +23,9 @@ async function deliver(recipient: string, subject: string, body: string) {
     body: JSON.stringify({ from, to: [recipient], subject, text: body }),
   });
   if (!response.ok) throw new Error(`EMAIL_PROVIDER_ERROR_${response.status}`);
+  const result = await response.json().catch(() => ({}));
+  if (!result.id) throw new Error("EMAIL_PROVIDER_INVALID_RESPONSE");
+  return String(result.id);
 }
 
 const authenticated = withSupabase({ auth: "user" }, async (request, ctx) => {
@@ -40,7 +44,15 @@ const authenticated = withSupabase({ auth: "user" }, async (request, ctx) => {
     if (existing.data.status === "sent") return json(request, { email: existing.data });
 
     try {
-      await deliver(existing.data.recipient, existing.data.subject, existing.data.body);
+      const providerMessageId = await deliver(existing.data.recipient, existing.data.subject, existing.data.body);
+      const sent = await client.from("candidate_emails").update({
+        status: "sent",
+        sent_at: new Date().toISOString(),
+        provider_message_id: providerMessageId,
+        delivery_status: "queued",
+      }).eq("id", emailId).select(selection).single();
+      if (sent.error) throw sent.error;
+      return json(request, { email: sent.data });
     } catch (deliveryError) {
       console.error(deliveryError);
       const failed = await client.from("candidate_emails").update({ status: "failed" }).eq("id", emailId).select(selection).single();
@@ -48,9 +60,6 @@ const authenticated = withSupabase({ auth: "user" }, async (request, ctx) => {
       return json(request, { email: failed.data, error: "DELIVERY_FAILED" }, 502);
     }
 
-    const sent = await client.from("candidate_emails").update({ status: "sent", sent_at: new Date().toISOString() }).eq("id", emailId).select(selection).single();
-    if (sent.error) throw sent.error;
-    return json(request, { email: sent.data });
   } catch (error) {
     console.error(error);
     return json(request, { error: "EMAIL_OPERATION_FAILED" }, 500);

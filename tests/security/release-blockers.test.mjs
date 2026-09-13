@@ -15,6 +15,22 @@ test("candidate document uploads reject anonymous Supabase identities", async ()
   assert.match(edge, /userClaims\?\.is_anonymous === true/);
 });
 
+test("Cloudmersive scanner adapter uses multipart uploads and Apikey authentication", async () => {
+  const edge = await source("supabase/functions/candidate-documents/index.ts");
+  assert.match(edge, /provider === "cloudmersive"/);
+  assert.match(edge, /form\.append\("inputFile"/);
+  assert.match(edge, /headers = \{ Apikey: token \}/);
+  assert.match(edge, /result\.CleanResult === true/);
+  assert.match(edge, /AbortSignal\.timeout\(30_000\)/);
+});
+
+test("transactional email has no placeholder sender fallback", async () => {
+  const edge = await source("supabase/functions/send-candidate-email/index.ts");
+  assert.match(edge, /RESEND_FROM_EMAIL/);
+  assert.match(edge, /EMAIL_FROM_ADDRESS_NOT_CONFIGURED/);
+  assert.doesNotMatch(edge, /medibridge-careers\.example/);
+});
+
 test("candidate RLS policies reject anonymous Supabase identities", async () => {
   const migration = await source("supabase/migrations/20260907150000_reject_anonymous_candidate_access.sql");
   assert.match(migration, /auth\.jwt\(\) ->> 'is_anonymous'/);
@@ -87,4 +103,23 @@ test("candidate saved jobs always expose the id selected by the application", as
 test("scheduled backup verification uses production environment secrets", async () => {
   const workflow = await source(".github/workflows/backup.yml");
   assert.match(workflow, /environment: production/);
+});
+
+test("Sprint 7 E2E is mandatory and cannot silently skip", async () => {
+  const workflow = await source(".github/workflows/ci.yml");
+  const config = await source("playwright.config.ts");
+  const candidate = await source("e2e/01-candidate-journey.spec.ts");
+  const backoffice = await source("e2e/02-backoffice-journey.spec.ts");
+  assert.match(workflow, /environment: staging/);
+  assert.match(workflow, /Require the Sprint 7 staging gate/);
+  assert.match(workflow, /test \"\$SUPABASE_PROJECT_REF\" != \"idzahhvslobjywqyklml\"/);
+  assert.match(workflow, /test \"\$NEXT_PUBLIC_SUPABASE_URL\" != \"https:\/\/idzahhvslobjywqyklml\.supabase\.co\"/);
+  assert.match(config, /globalSetup/);
+  assert.doesNotMatch(candidate + backoffice, /test\.skip/);
+});
+
+test("staging deployment rejects production Supabase", async () => {
+  const workflow = await source(".github/workflows/deploy-staging.yml");
+  assert.match(workflow, /test \"\$SUPABASE_PROJECT_REF\" != \"idzahhvslobjywqyklml\"/);
+  assert.match(workflow, /test \"\$NEXT_PUBLIC_SUPABASE_URL\" != \"https:\/\/idzahhvslobjywqyklml\.supabase\.co\"/);
 });
