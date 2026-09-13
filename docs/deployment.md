@@ -25,14 +25,16 @@ production Supabase project.
 
 1. Feature branch is created off `main`; work happens in a PR.
 2. CI (`.github/workflows/ci.yml`) runs on every PR: `lint`, `typecheck`,
-   `unit-tests`, `build`, `build-tests`, `migrations`, and (once staging
-   exists and the `E2E_ENABLED` repository variable is set) `e2e`.
+   `unit-tests`, `build`, `build-tests`, `migrations`, and the mandatory
+   staging `e2e` gate. Missing staging configuration fails the gate instead
+   of silently skipping browser tests.
    `build-tests` verifies the built worker renders real MediBridge markup
    (not generic starter-demo output) and is a required, blocking check (see
    the comment in the workflow file).
 3. All required checks must pass (configure branch protection on `main` to
-   require `lint`, `typecheck`, `unit-tests`, `build`, `build-tests`, and
-   `migrations` — see "Branch protection" below).
+   require `lint`, `typecheck`, `unit-tests`, `build`, `build-tests`,
+   `migrations`, and `End-to-end tests (Playwright)` — see "Branch
+   protection" below).
 4. On merge to `main`:
    - Vercel automatically deploys the staging project from `main`.
    - Any new Supabase migrations are applied to the staging Supabase project
@@ -81,9 +83,9 @@ deployment credentials and must be configured before promotion.
 Outside of the workflow file itself, configure the `main` branch protection
 rule (Settings → Branches) to require the following status checks before
 merging: `lint`, `typecheck`, `unit-tests`, `build`, `build-tests`,
-`migrations`. Do not require `e2e` (only meaningful once a staging
-environment and its secrets exist) until it is reliable enough to gate
-merges.
+`migrations`, and `End-to-end tests (Playwright)`. The staging environment
+and all values in `docs/sprint-7-acceptance.md` must therefore be configured
+before this rule is enabled.
 
 ## Rollback process
 
