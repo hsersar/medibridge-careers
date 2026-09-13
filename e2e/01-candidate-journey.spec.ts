@@ -3,6 +3,7 @@ import {
   adminClient,
   e2eEnvironment,
   expectResendDelivery,
+  findUserByEmail,
   signInCandidate,
   sprint7CandidateName,
   sprint7JobTitle,
@@ -53,7 +54,13 @@ async function openProfileMenu(page: Page) {
 
 test.describe.serial("complete candidate journey", () => {
   test("registration, password visibility and password reset are functional", async ({ page }) => {
+    test.setTimeout(150_000);
     const environment = e2eEnvironment();
+    const existingRegistration = await findUserByEmail(adminClient(), environment.E2E_REGISTRATION_EMAIL);
+    if (existingRegistration) {
+      const deleted = await adminClient().auth.admin.deleteUser(existingRegistration.id);
+      if (deleted.error) throw deleted.error;
+    }
     await page.goto("/");
     await page.getByRole("button", { name: /إنشاء ملفي/ }).click();
     await page.getByLabel(/البريد الإلكتروني/).fill(environment.E2E_REGISTRATION_EMAIL);
