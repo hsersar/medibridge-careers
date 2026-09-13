@@ -93,6 +93,15 @@ test("application sends the required production security headers", async () => {
   assert.match(config, /poweredByHeader:\s*false/);
 });
 
+test("staging configuration cannot silently fall back to production Supabase", async () => {
+  const client = await source("lib/supabase.ts");
+  const config = await source("next.config.ts");
+  assert.doesNotMatch(client, /idzahhvslobjywqyklml/);
+  assert.doesNotMatch(client, /sb_publishable_b5Sy7/);
+  assert.match(config, /process\.env\.NEXT_PUBLIC_SUPABASE_URL/);
+  assert.match(config, /supabaseWebSocketOrigin/);
+});
+
 test("candidate saved jobs always expose the id selected by the application", async () => {
   const migration = await source("supabase/migrations/20260912100000_sprint_6_release_hardening.sql");
   assert.match(migration, /candidate_saved_jobs[\s\S]+add column if not exists id uuid/);
