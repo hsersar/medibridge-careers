@@ -1,5 +1,9 @@
 import type { NextConfig } from "next";
 
+const configuredSupabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "http://127.0.0.1:54321";
+const supabaseOrigin = new URL(configuredSupabaseUrl).origin;
+const supabaseWebSocketOrigin = supabaseOrigin.replace(/^http/, "ws");
+
 const contentSecurityPolicy = [
   "default-src 'self'",
   "base-uri 'self'",
@@ -9,8 +13,8 @@ const contentSecurityPolicy = [
   "script-src 'self' 'unsafe-inline'",
   "style-src 'self' 'unsafe-inline'",
   "font-src 'self' data:",
-  "img-src 'self' data: blob: https://idzahhvslobjywqyklml.supabase.co https://*.r2.cloudflarestorage.com",
-  "connect-src 'self' https://idzahhvslobjywqyklml.supabase.co wss://idzahhvslobjywqyklml.supabase.co https://*.r2.cloudflarestorage.com",
+  `img-src 'self' data: blob: ${supabaseOrigin} https://*.r2.cloudflarestorage.com`,
+  `connect-src 'self' ${supabaseOrigin} ${supabaseWebSocketOrigin} https://*.r2.cloudflarestorage.com`,
   "frame-src 'self' blob:",
   "worker-src 'self' blob:",
   "manifest-src 'self'",
