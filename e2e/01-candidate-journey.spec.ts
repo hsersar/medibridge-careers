@@ -57,8 +57,8 @@ test.describe.serial("complete candidate journey", () => {
     await page.goto("/");
     await page.getByRole("button", { name: /إنشاء ملفي/ }).click();
     await page.getByLabel(/البريد الإلكتروني/).fill(environment.E2E_REGISTRATION_EMAIL);
-    await page.getByLabel(/كلمة المرور/).fill(environment.E2E_CANDIDATE_PASSWORD);
     const password = page.locator('input[autocomplete="new-password"]');
+    await password.fill(environment.E2E_CANDIDATE_PASSWORD);
     await expect(password).toHaveAttribute("type", "password");
     await page.getByRole("button", { name: /إظهار كلمة المرور/ }).click();
     await expect(password).toHaveAttribute("type", "text");
